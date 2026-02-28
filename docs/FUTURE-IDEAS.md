@@ -31,14 +31,19 @@ Script exists at `scripts/generate-sounds.ts` — reads cue-map.yaml, calls API,
 Sound prompts documented in `public/sounds/SOUND-GENERATION-PROMPTS.md` (50 sounds across 3 stories).
 Currently manual — run script or generate individually. Future: integrate into pipeline above.
 
-## Scene Imagery During Gameplay
-Show visual representations of the current location/scene to the user during gameplay. Each story has card images already (`public/images/stories/{id}/card.webp`) — extend this with scene-specific images that change as the story progresses.
+## Scene-Setting Images (Onboarding)
+Show 2-3 images during onboarding to ground the user's imagination BEFORE they close their eyes. "This is where you are. This is what it looks like." Then voice takes over and they walk in their imagination.
 
-**Approach:**
-- Pre-generated scene images per phase/beat (stored in `public/images/stories/{id}/scene-{n}.webp`)
-- Subtle fade transitions between scenes, don't break immersion
-- Images should be atmospheric/abstract (not literal) — eyes-closed game, images are for before/after
-- Future: auto-generate scene images from story description using image generation API
+**Already working:** OnboardingFlow shows scene images → text overlay → "continue" → headphones → countdown → game starts. Lighthouse and Room 4B have 2 scenes each.
+
+**Needed now:**
+- `public/images/stories/the-last-session/scene-1.webp` — the therapy office (warm lamp, leather chair, dim room)
+- `public/images/stories/the-last-session/scene-2.webp` — Elara's perspective (the door, the waiting area, arriving)
+- Once images exist, add entries to `STORY_ONBOARDING` in `OnboardingFlow.tsx`
+
+**Image style:** Atmospheric, slightly abstract, dark/moody. NOT photorealistic — painterly or cinematic. Help imagination, don't constrain it.
+
+**Future:** Auto-generate scene images per story via image generation API (see pipeline below)
 
 ## Auto-Generated Imagery in Story Pipeline
 When a user uploads a story, automatically determine what images are needed:
