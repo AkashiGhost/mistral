@@ -2,7 +2,6 @@
 
 import { useEffect } from "react";
 import { useGame } from "@/context/GameContext";
-import { ChoiceDisplay } from "./ChoiceDisplay";
 
 // ─────────────────────────────────────────────
 // Game Session — Mistral / ElevenLabs version
@@ -170,9 +169,6 @@ export function GameSession() {
           {lastElaraText}
         </div>
       )}
-
-      {/* Choice overlay */}
-      <ChoiceDisplay />
 
       {/* End session — barely visible, for edge cases */}
       <div

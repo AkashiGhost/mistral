@@ -173,6 +173,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
         void pollGameState();
       }
     },
+    onModeChange: ({ mode }: { mode: string }) => {
+      // mode is "speaking" or "listening" — we already track isSpeaking from the hook
+    },
     onError: (message: string) => {
       console.error("[ElevenLabs]", message);
       dispatch({ type: "SET_STATUS", status: "error" });
@@ -200,7 +203,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      const cid = await conversation.startSession({ agentId });
+      const cid = await conversation.startSession({
+        agentId,
+        connectionType: "webrtc",
+      });
       conversationIdRef.current = cid;
       dispatch({ type: "SET_CONVERSATION_ID", id: cid });
 

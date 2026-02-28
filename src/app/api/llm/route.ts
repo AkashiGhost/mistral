@@ -12,12 +12,12 @@ import {
   createSession,
   updateSession,
 } from "@/lib/session-store";
-import { initState, getCurrentBeat, advanceBeat, evaluateEndingCondition } from "@/lib/state-machine";
+import { initState, getCurrentBeat, advanceBeat, evaluateEndingCondition, resolveChoice } from "@/lib/state-machine";
 import { buildContext } from "@/lib/llm/context-builder";
 import { parseSoundCues } from "@/lib/sound-cue-parser";
 import { callMistralStory, MistralIntentParser } from "@/lib/llm/mistral-adapter";
 import type { ConversationTurn } from "@/lib/types/story-state";
-import type { GameConfig } from "@/lib/types/game-config";
+import type { GameConfig, Beat, ChoiceOption } from "@/lib/types/game-config";
 
 // Must be Node.js runtime — Edge does not support module-level Map persistence
 export const runtime = "nodejs";
@@ -67,13 +67,53 @@ export async function POST(req: NextRequest) {
     const userMessages = messages.filter((m) => m.role === "user");
     const playerText = String(userMessages[userMessages.length - 1]?.content ?? "").trim();
 
+    // ── If there's a pending voice choice, match the player's response ──
+    let { state } = session;
+    const currentPendingChoice = session.pendingChoice;
+    if (currentPendingChoice && playerText) {
+      const choiceOptions = currentPendingChoice.options;
+      const matchedOption = choiceOptions.find((opt) => {
+        const words = opt.label.toLowerCase().split(/\s+/);
+        const playerLower = playerText.toLowerCase();
+        return words.some((word) => word.length > 3 && playerLower.includes(word));
+      });
+
+      if (matchedOption) {
+        const beat = config.arc.phases[state.currentPhaseIndex]?.beats?.find(
+          (b: Beat) => b.id === currentPendingChoice.beatId,
+        );
+        const fullOption = beat?.options?.find((o: ChoiceOption) => o.id === matchedOption.id);
+        if (fullOption) {
+          state = resolveChoice(state, currentPendingChoice.beatId, matchedOption.id, fullOption);
+          updateSession(conversation_id, { state, pendingChoice: null });
+          // Refresh session reference after update
+          session = getSession(conversation_id)!;
+        }
+      }
+    }
+
     // ── Build story system prompt ─────────────────────────────────
-    const { state } = session;
     const currentPhaseIndex = state.currentPhaseIndex;
     const currentPhase = config.arc.phases[currentPhaseIndex];
     const currentBeat = getCurrentBeat(config, state);
 
-    const { systemPrompt } = buildContext(config, state, currentPhase, currentBeat);
+    let { systemPrompt } = buildContext(config, state, currentPhase, currentBeat);
+
+    // ── If a voice choice is pending, inject directive into system prompt ──
+    // This happens when the previous turn detected a choice beat. Elara
+    // should present the options verbally so the player can respond by voice.
+    if (session.pendingChoice) {
+      const choiceLines = session.pendingChoice.options
+        .map((opt, i) => `- Option ${i + 1}: ${opt.label}`)
+        .join("\n");
+      systemPrompt += [
+        "\n\n[CHOICE MOMENT] Present these options to the player naturally in your next response.",
+        "Do not list them mechanically — weave them into your dialogue as Elara would.",
+        "Make each option sound like a natural suggestion or question:",
+        choiceLines,
+        "Wait for the player's verbal response before continuing.",
+      ].join("\n");
+    }
 
     // ── Assemble messages for Mistral ─────────────────────────────
     // Replace ElevenLabs system message with ours; pass conversation history as-is
@@ -118,7 +158,7 @@ export async function POST(req: NextRequest) {
       return openAiSSEResponse(cleanText);
     }
 
-    // ── Check for beat with choices — surface to client via polling ──
+    // ── Check for beat with choices — store for voice presentation next turn ──
     const nextBeat = getCurrentBeat(config, nextState);
     let pendingChoice = session.pendingChoice;
     if (nextBeat?.type === "choice" && nextBeat.options && !pendingChoice) {
