@@ -63,12 +63,15 @@ export async function POST(req: NextRequest) {
       ?? (body.elevenlabs_extra_body?.conversation_id as string | undefined)
       ?? undefined;
 
-    // If no conversation_id available, generate one from content hash
+    // If no conversation_id available, generate one from the FIRST user message.
+    // ElevenLabs accumulates the full conversation history on each request,
+    // so the first user message stays constant across all turns of the same session.
+    // Using the last message would create a new session every turn, losing game state.
     if (!conversation_id) {
       const userMsgs = messages.filter(m => m.role === "user");
-      const lastUserMsg = userMsgs[userMsgs.length - 1]?.content ?? "";
-      // Simple hash: use first 12 chars of base64-encoded content
-      const hash = Buffer.from(lastUserMsg).toString("base64").slice(0, 12);
+      const firstUserMsg = userMsgs[0]?.content ?? "";
+      // Simple hash: use first 16 chars of base64-encoded content for uniqueness
+      const hash = Buffer.from(firstUserMsg).toString("base64").slice(0, 16);
       conversation_id = `auto-${hash}`;
     }
 
