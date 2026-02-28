@@ -206,6 +206,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const cid = await conversation.startSession({
         agentId,
         connectionType: "webrtc",
+        overrides: {
+          agent: {
+            prompt: {
+              prompt:
+                "You are Elara. Your actual personality and story instructions are provided by the custom LLM server. Simply relay the responses from the custom LLM naturally. Do not add your own personality or instructions beyond what the LLM provides.",
+            },
+            firstMessage:
+              "Thank you for seeing me tonight, doctor. The building is strange at this hour — I don't think I've ever heard it this quiet.",
+          },
+        },
       });
       conversationIdRef.current = cid;
       dispatch({ type: "SET_CONVERSATION_ID", id: cid });

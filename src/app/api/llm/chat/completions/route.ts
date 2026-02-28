@@ -53,6 +53,14 @@ interface LLMWebhookRequest {
 export async function POST(req: NextRequest) {
   try {
     const body = (await req.json()) as LLMWebhookRequest;
+    console.log("[WEBHOOK] Request received:", JSON.stringify({
+      messageCount: body.messages?.length,
+      roles: body.messages?.map(m => m.role),
+      systemPromptPreview: body.messages?.find(m => m.role === "system")?.content?.slice(0, 100),
+      hasConversationId: !!body.conversation_id,
+      hasElevenLabsExtra: !!body.elevenlabs_extra_body,
+      stream: body.stream,
+    }, null, 2));
     const { messages } = body;
 
     if (!Array.isArray(messages)) {
