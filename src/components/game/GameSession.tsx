@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useGame } from "@/context/GameContext";
 
 // ─────────────────────────────────────────────
@@ -15,8 +15,56 @@ export function GameSession() {
     lastElaraText,
     isSpeaking,
     hasElaraSpoken,
+    activeChoice,
     endSession,
   } = useGame();
+
+  // ── Mount / unmount logging ──────────────────────────────────
+  useEffect(() => {
+    console.log("[SESSION] GameSession mounted");
+    return () => {
+      console.log("[SESSION] GameSession unmounted");
+    };
+  }, []);
+
+  // ── Status change logging ────────────────────────────────────
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current !== status) {
+      console.log(`[SESSION] Status changed: ${prevStatusRef.current} → ${status}`);
+      prevStatusRef.current = status;
+    }
+  }, [status]);
+
+  // ── isSpeaking change logging ────────────────────────────────
+  const prevIsSpeakingRef = useRef(isSpeaking);
+  useEffect(() => {
+    if (prevIsSpeakingRef.current !== isSpeaking) {
+      console.log(`[SESSION] isSpeaking changed: ${prevIsSpeakingRef.current} → ${isSpeaking}`);
+      prevIsSpeakingRef.current = isSpeaking;
+    }
+  }, [isSpeaking]);
+
+  // ── activeChoice appear / disappear logging ──────────────────
+  const prevActiveChoiceRef = useRef(activeChoice);
+  useEffect(() => {
+    const prev = prevActiveChoiceRef.current;
+    prevActiveChoiceRef.current = activeChoice;
+    if (!prev && activeChoice) {
+      console.log(`[SESSION] activeChoice appeared — beatId=${activeChoice.beatId}, options=[${activeChoice.options.map((o) => o.id).join(", ")}]`);
+    } else if (prev && !activeChoice) {
+      console.log(`[SESSION] activeChoice cleared (beatId=${prev.beatId})`);
+    }
+  }, [activeChoice]);
+
+  // ── hasElaraSpoken change logging ────────────────────────────
+  const prevHasElaraSpokenRef = useRef(hasElaraSpoken);
+  useEffect(() => {
+    if (prevHasElaraSpokenRef.current !== hasElaraSpoken) {
+      console.log(`[SESSION] hasElaraSpoken changed: ${prevHasElaraSpokenRef.current} → ${hasElaraSpoken}`);
+      prevHasElaraSpokenRef.current = hasElaraSpoken;
+    }
+  }, [hasElaraSpoken]);
 
   // TTS fallback: browser speaks Elara's text if ElevenLabs audio not yet received
   useEffect(() => {
@@ -25,6 +73,7 @@ export function GameSession() {
 
     const timer = setTimeout(() => {
       if (hasElaraSpoken) return;
+      console.log("[SESSION] TTS fallback triggered — ElevenLabs audio not received, using browser speechSynthesis");
       window.speechSynthesis.cancel();
       const utt = new SpeechSynthesisUtterance(lastElaraText);
       utt.rate = 0.85;
@@ -34,7 +83,12 @@ export function GameSession() {
       const femaleVoice = voices.find(
         (v) => v.lang.startsWith("en") && /female|woman|girl|zira|hazel|samantha/i.test(v.name)
       );
-      if (femaleVoice) utt.voice = femaleVoice;
+      if (femaleVoice) {
+        console.log(`[SESSION] TTS fallback voice selected: ${femaleVoice.name}`);
+        utt.voice = femaleVoice;
+      } else {
+        console.log("[SESSION] TTS fallback: no matching female voice found, using browser default");
+      }
       window.speechSynthesis.speak(utt);
     }, 300);
     return () => clearTimeout(timer);
@@ -180,7 +234,10 @@ export function GameSession() {
       >
         <button
           type="button"
-          onClick={() => void endSession()}
+          onClick={() => {
+            console.log("[SESSION] User clicked 'end session' button");
+            void endSession();
+          }}
           style={{
             background: "none",
             border: "none",

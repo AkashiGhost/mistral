@@ -28,9 +28,14 @@ function getConfig(): GameConfig {
 // GET /api/game-state?cid=<conversationId>
 export async function GET(req: NextRequest) {
   const cid = req.nextUrl.searchParams.get("cid");
-  if (!cid) return NextResponse.json({ error: "Missing cid" }, { status: 400 });
+  if (!cid) {
+    console.error("[GAME-STATE] GET missing cid parameter");
+    return NextResponse.json({ error: "Missing cid" }, { status: 400 });
+  }
 
   const session = getSession(cid);
+  console.log(`[GAME-STATE] GET for cid=${cid}, found=${session !== undefined}`);
+
   if (!session) {
     return NextResponse.json({
       phase: 0,
@@ -48,6 +53,12 @@ export async function GET(req: NextRequest) {
   const soundCues = [...(pendingSoundCues ?? [])];
   if (soundCues.length > 0) clearSoundCues(cid);
 
+  console.log(
+    `[GAME-STATE] GET returning: phase=${state.currentPhaseIndex}, beat=${state.currentBeatIndex}, ` +
+    `trust=${state.elara.trustLevel}, gameOver=${gameOver}, ` +
+    `choice=${pendingChoice?.beatId ?? 'none'}, soundCues=[${soundCues.map((c) => c.soundId).join(', ')}]`,
+  );
+
   return NextResponse.json({
     phase: state.currentPhaseIndex,
     beatIndex: state.currentBeatIndex,
@@ -63,10 +74,21 @@ export async function GET(req: NextRequest) {
 
 // POST /api/game-state — initialise or reset a session
 export async function POST(req: NextRequest) {
-  const { conversationId } = (await req.json()) as { conversationId?: string };
+  let body: { conversationId?: string };
+  try {
+    body = (await req.json()) as { conversationId?: string };
+  } catch (err) {
+    console.error("[GAME-STATE] POST failed to parse request body:", err);
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { conversationId } = body;
   if (!conversationId) {
+    console.error("[GAME-STATE] POST missing conversationId");
     return NextResponse.json({ error: "Missing conversationId" }, { status: 400 });
   }
+
+  console.log(`[GAME-STATE] POST init for cid=${conversationId}`);
 
   const config = getConfig();
   const existingSession = getSession(conversationId);
@@ -74,8 +96,10 @@ export async function POST(req: NextRequest) {
   if (!existingSession) {
     const initialState = initState(config);
     createSession(conversationId, initialState);
+    console.log(`[GAME-STATE] POST created new session for cid=${conversationId}`);
   } else {
     // Re-init (e.g., after ElevenLabs reconnect)
+    console.log(`[GAME-STATE] POST re-initialising existing session for cid=${conversationId}`);
     const initialState = initState(config);
     updateSession(conversationId, {
       state: initialState,

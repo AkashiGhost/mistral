@@ -51,19 +51,28 @@ interface LLMWebhookRequest {
 }
 
 export async function POST(req: NextRequest) {
+  const requestStart = Date.now();
+  console.log(`[WEBHOOK] === NEW REQUEST === timestamp=${new Date(requestStart).toISOString()}`);
+
   try {
     const body = (await req.json()) as LLMWebhookRequest;
-    console.log("[WEBHOOK] Request received:", JSON.stringify({
-      messageCount: body.messages?.length,
-      roles: body.messages?.map(m => m.role),
-      systemPromptPreview: body.messages?.find(m => m.role === "system")?.content?.slice(0, 100),
-      hasConversationId: !!body.conversation_id,
-      hasElevenLabsExtra: !!body.elevenlabs_extra_body,
-      stream: body.stream,
-    }, null, 2));
+
+    // ── Log full request shape ───────────────────────────────────
+    const messageSummary = (body.messages ?? []).map((m) => ({
+      role: m.role,
+      contentLength: m.content?.length ?? 0,
+    }));
+    const elevenLabsSystemPrompt = body.messages?.find((m) => m.role === "system")?.content ?? "";
+    console.log(`[WEBHOOK] Body parsed: messageCount=${body.messages?.length ?? 0}, stream=${body.stream ?? false}`);
+    console.log(`[WEBHOOK] Messages breakdown:`, JSON.stringify(messageSummary));
+    console.log(`[WEBHOOK] ElevenLabs system prompt preview (first 200): "${elevenLabsSystemPrompt.slice(0, 200)}"`);
+    console.log(`[WEBHOOK] conversation_id from body: ${body.conversation_id ?? "(none)"}`);
+    console.log(`[WEBHOOK] elevenlabs_extra_body present: ${!!body.elevenlabs_extra_body}`);
+
     const { messages } = body;
 
     if (!Array.isArray(messages)) {
+      console.error("[WEBHOOK] ERROR: messages field is not an array");
       return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
@@ -82,24 +91,31 @@ export async function POST(req: NextRequest) {
       // Simple hash: use first 16 chars of base64-encoded content for uniqueness
       const hash = Buffer.from(firstUserMsg).toString("base64").slice(0, 16);
       conversation_id = `auto-${hash}`;
+      console.log(`[WEBHOOK] No conversation_id found — generated from first user message: ${conversation_id}`);
     }
 
     const config = getConfig();
 
     // Get or init session state
     let session = getSession(conversation_id);
+    const sessionWasNew = !session;
     if (!session) {
       const initialState = initState(config);
       session = createSession(conversation_id, initialState);
     }
+    console.log(
+      `[WEBHOOK] Session: ${sessionWasNew ? "created" : "found"}, conversationId=${conversation_id}, gameOver=${session.gameOver}, phase=${session.state.currentPhaseIndex}, beat=${session.state.currentBeatIndex}`,
+    );
 
     if (session.gameOver) {
+      console.log(`[WEBHOOK] Session is gameOver — returning early end message`);
       return openAiSSEResponse("The session has ended. Goodbye.");
     }
 
     // ── Extract player's latest message ──────────────────────────
     const userMessages = messages.filter((m) => m.role === "user");
     const playerText = String(userMessages[userMessages.length - 1]?.content ?? "").trim();
+    console.log(`[WEBHOOK] Player said: "${playerText.slice(0, 100)}${playerText.length > 100 ? "..." : ""}"`);
 
     // ── If there's a pending voice choice, match the player's response ──
     let { state } = session;
@@ -113,6 +129,7 @@ export async function POST(req: NextRequest) {
       });
 
       if (matchedOption) {
+        console.log(`[WEBHOOK] Choice match: matched — option id="${matchedOption.id}", label="${matchedOption.label}"`);
         const beat = config.arc.phases[state.currentPhaseIndex]?.beats?.find(
           (b: Beat) => b.id === currentPendingChoice.beatId,
         );
@@ -123,7 +140,11 @@ export async function POST(req: NextRequest) {
           // Refresh session reference after update
           session = getSession(conversation_id)!;
         }
+      } else {
+        console.log(`[WEBHOOK] Choice match: no-match (pendingChoice beatId="${currentPendingChoice.beatId}", options=[${choiceOptions.map((o) => o.label).join(", ")}])`);
       }
+    } else if (!currentPendingChoice) {
+      console.log(`[WEBHOOK] Choice match: no-pending`);
     }
 
     // ── Build story system prompt ─────────────────────────────────
@@ -149,6 +170,8 @@ export async function POST(req: NextRequest) {
       ].join("\n");
     }
 
+    console.log(`[WEBHOOK] System prompt length: ${systemPrompt.length} chars, preview: "${systemPrompt.slice(0, 200)}"`);
+
     // ── Assemble messages for Mistral ─────────────────────────────
     // Replace ElevenLabs system message with ours; pass conversation history as-is
     const mistralMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
@@ -157,6 +180,8 @@ export async function POST(req: NextRequest) {
         .filter((m) => m.role !== "system")
         .map((m) => ({ role: m.role, content: m.content })),
     ];
+
+    console.log(`[WEBHOOK] Starting Mistral stream with ${mistralMessages.length} messages`);
 
     // ── Stream Mistral Large → SSE in real-time ─────────────────
     // Chunks are forwarded to ElevenLabs as they arrive from Mistral,
@@ -179,11 +204,19 @@ export async function POST(req: NextRequest) {
       async start(controller) {
         try {
           let first = true;
+          let firstChunkTime: number | null = null;
+          let chunkCount = 0;
+
           for await (const chunk of streamMistralStory(
             process.env.MISTRAL_API_KEY!,
             mistralMessages,
           )) {
+            if (first) {
+              firstChunkTime = Date.now();
+              console.log(`[WEBHOOK] First chunk received after ${firstChunkTime - requestStart}ms`);
+            }
             fullText += chunk;
+            chunkCount++;
 
             const data = {
               id: sseId,
@@ -201,6 +234,8 @@ export async function POST(req: NextRequest) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
             first = false;
           }
+
+          console.log(`[WEBHOOK] Stream complete, total chunks=${chunkCount}, total response: ${fullText.length} chars, preview: "${fullText.slice(0, 200)}"`);
 
           // Finish chunk
           const finish = {
@@ -226,6 +261,9 @@ export async function POST(req: NextRequest) {
             fullText,
           );
         } catch (err) {
+          const error = err as Error;
+          console.error(`[WEBHOOK] ERROR inside SSE stream: ${error.message}`);
+          console.error(error.stack);
           controller.error(err);
         }
       },
@@ -239,7 +277,9 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("[/api/llm/chat/completions]", err);
+    const error = err as Error;
+    console.error(`[WEBHOOK] ERROR: ${error.message}`);
+    console.error(error.stack);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
@@ -257,9 +297,11 @@ async function performPostStreamUpdates(
   playerText: string,
   rawResponse: string,
 ): Promise<void> {
+  console.log(`[WEBHOOK] performPostStreamUpdates starting for conversationId=${conversationId}`);
   try {
     // ── Parse sound cues from full accumulated response ─────────
     const { cleanText, cues } = parseSoundCues(rawResponse);
+    console.log(`[WEBHOOK] Sound cues found: ${cues.length}${cues.length > 0 ? ` — [${cues.map((c) => c.soundId).join(", ")}]` : ""}`);
 
     // ── Update conversation history in state ──────────────────────
     const playerTurn: ConversationTurn = { role: "player", text: playerText, timestamp: Date.now() };
@@ -272,11 +314,19 @@ async function performPostStreamUpdates(
     };
 
     // ── Advance beat ──────────────────────────────────────────────
+    const prevBeatIndex = nextState.currentBeatIndex;
+    const prevPhaseIndex = nextState.currentPhaseIndex;
     nextState = advanceBeat(config, nextState);
+    const beatAdvanced =
+      nextState.currentBeatIndex !== prevBeatIndex || nextState.currentPhaseIndex !== prevPhaseIndex;
+    console.log(
+      `[WEBHOOK] Beat advanced: ${beatAdvanced} — phase=${prevPhaseIndex}→${nextState.currentPhaseIndex}, beat=${prevBeatIndex}→${nextState.currentBeatIndex}`,
+    );
 
     // ── Check for ending ──────────────────────────────────────────
     const endingId = evaluateEndingCondition(config, nextState);
     if (endingId) {
+      console.log(`[WEBHOOK] Ending detected: endingId="${endingId}" — marking gameOver`);
       nextState = { ...nextState, endingId };
       updateSession(conversationId, {
         state: nextState,
@@ -285,6 +335,7 @@ async function performPostStreamUpdates(
       });
       return;
     }
+    console.log(`[WEBHOOK] Ending detected: none`);
 
     // ── Check for beat with choices — store for voice presentation next turn ──
     const nextBeat = getCurrentBeat(config, nextState);
@@ -297,16 +348,23 @@ async function performPostStreamUpdates(
           label: c.label,
         })),
       };
+      console.log(`[WEBHOOK] Choice detected: beatId="${nextBeat.id}", options=[${nextBeat.options.map((o) => o.label).join(", ")}]`);
+    } else {
+      console.log(`[WEBHOOK] Choice detected: none (nextBeat type="${nextBeat?.type ?? "null"}")`);
     }
 
     // ── Classify intent (async — for style tracker) ──────────────
     let nextStateWithStyle = nextState;
     try {
+      console.log(`[WEBHOOK] Style tracking: running intent classification for playerText="${playerText.slice(0, 60)}"`);
       const intent = await intentParser.parse(playerText);
+      console.log(`[WEBHOOK] Style tracking: intent="${intent.intent}", emotionalRegister="${intent.emotionalRegister}", challengeLevel="${intent.challengeLevel}"`);
       const styleImport = await import("@/lib/style-tracker");
       nextStateWithStyle = styleImport.applyIntentScore(nextState, intent.emotionalRegister);
-    } catch {
-      // Style tracking is non-critical
+      console.log(`[WEBHOOK] Style tracking: applied — playerStyleScores=${JSON.stringify(nextStateWithStyle.playerStyleScores)}`);
+    } catch (styleErr) {
+      const styleError = styleErr as Error;
+      console.error(`[WEBHOOK] Style tracking failed (non-critical): ${styleError.message}`);
     }
 
     updateSession(conversationId, {
@@ -317,8 +375,11 @@ async function performPostStreamUpdates(
         ...cues.map((c) => ({ soundId: c.soundId, position: c.position })),
       ],
     });
+    console.log(`[WEBHOOK] performPostStreamUpdates complete for conversationId=${conversationId}`);
   } catch (err) {
-    console.error("[post-stream state update]", err);
+    const error = err as Error;
+    console.error(`[WEBHOOK] ERROR in performPostStreamUpdates: ${error.message}`);
+    console.error(error.stack);
   }
 }
 

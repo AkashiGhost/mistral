@@ -19,18 +19,26 @@ function getConfig(): GameConfig {
 }
 
 export async function POST(req: NextRequest) {
-  const { conversationId, beatId, optionId } = (await req.json()) as {
-    conversationId?: string;
-    beatId?: string;
-    optionId?: string;
-  };
+  let body: { conversationId?: string; beatId?: string; optionId?: string };
+  try {
+    body = (await req.json()) as { conversationId?: string; beatId?: string; optionId?: string };
+  } catch (err) {
+    console.error("[CHOICE] Failed to parse request body:", err);
+    return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+  }
+
+  const { conversationId, beatId, optionId } = body;
 
   if (!conversationId || !beatId || !optionId) {
+    console.error(`[CHOICE] Missing required fields: cid=${conversationId ?? 'undefined'}, beat=${beatId ?? 'undefined'}, option=${optionId ?? 'undefined'}`);
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
   }
 
+  console.log(`[CHOICE] Received: cid=${conversationId}, beat=${beatId}, option=${optionId}`);
+
   const session = getSession(conversationId);
   if (!session) {
+    console.error(`[CHOICE] Session not found for cid=${conversationId}`);
     return NextResponse.json({ error: "Session not found" }, { status: 404 });
   }
 
@@ -42,10 +50,16 @@ export async function POST(req: NextRequest) {
   const option = beat?.options?.find((c) => c.id === optionId);
 
   if (!option) {
+    console.error(`[CHOICE] Option not found: beat=${beatId}, option=${optionId}, phase=${session.state.currentPhaseIndex}`);
     return NextResponse.json({ error: "Option not found" }, { status: 404 });
   }
 
   const nextState = resolveChoice(session.state, beatId, optionId, option);
+
+  console.log(
+    `[CHOICE] Applied: cid=${conversationId}, trust=${session.state.elara.trustLevel}→${nextState.elara.trustLevel}, ` +
+    `styleScores=${JSON.stringify(nextState.playerStyleScores)}`,
+  );
 
   updateSession(conversationId, {
     state: nextState,

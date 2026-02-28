@@ -50,12 +50,18 @@ export function applyIntentScore(
   const style = REGISTER_TO_STYLE[register];
   if (!style) return state;
 
+  const newScores = {
+    ...state.playerStyleScores,
+    [style]: state.playerStyleScores[style] + INTENT_SCORE_DELTA,
+  };
+
+  console.log(
+    `[STYLE] Applied intent score: register=${register}, scores=${JSON.stringify(newScores)}`,
+  );
+
   return {
     ...state,
-    playerStyleScores: {
-      ...state.playerStyleScores,
-      [style]: state.playerStyleScores[style] + INTENT_SCORE_DELTA,
-    },
+    playerStyleScores: newScores,
   };
 }
 

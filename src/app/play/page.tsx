@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { GameProvider, useGame } from "@/context/GameContext";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
 import { GameSession } from "@/components/game/GameSession";
@@ -10,7 +10,34 @@ function PlayContent() {
   const [onboardingDone, setOnboardingDone] = useState(false);
   const { status, startSession } = useGame();
 
+  // ── Mount logging ────────────────────────────────────────────
+  useEffect(() => {
+    console.log("[PLAY] PlayContent mounted");
+    return () => {
+      console.log("[PLAY] PlayContent unmounted");
+    };
+  }, []);
+
+  // ── Status change logging ────────────────────────────────────
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    if (prevStatusRef.current !== status) {
+      console.log(`[PLAY] status changed: ${prevStatusRef.current} → ${status}`);
+      prevStatusRef.current = status;
+    }
+  }, [status]);
+
+  // ── onboardingDone change logging ────────────────────────────
+  const prevOnboardingRef = useRef(onboardingDone);
+  useEffect(() => {
+    if (prevOnboardingRef.current !== onboardingDone) {
+      console.log(`[PLAY] onboardingDone changed: ${prevOnboardingRef.current} → ${onboardingDone}`);
+      prevOnboardingRef.current = onboardingDone;
+    }
+  }, [onboardingDone]);
+
   const handleOnboardingComplete = useCallback(() => {
+    console.log("[PLAY] Onboarding complete — calling startSession()");
     setOnboardingDone(true);
     void startSession();
   }, [startSession]);
@@ -21,6 +48,7 @@ function PlayContent() {
 
   // Connecting to ElevenLabs
   if (status === "connecting") {
+    console.log("[PLAY] Rendering: connecting screen");
     return (
       <div
         style={{
@@ -56,6 +84,7 @@ function PlayContent() {
   }
 
   if (status === "error") {
+    console.log("[PLAY] Rendering: error screen");
     return (
       <div
         style={{
@@ -89,6 +118,14 @@ function PlayContent() {
 }
 
 export default function PlayPage() {
+  // ── Page-level mount logging ─────────────────────────────────
+  useEffect(() => {
+    console.log("[PLAY] PlayPage mounted");
+    return () => {
+      console.log("[PLAY] PlayPage unmounted");
+    };
+  }, []);
+
   return (
     <ErrorBoundary>
       <GameProvider>

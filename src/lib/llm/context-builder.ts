@@ -28,24 +28,37 @@ export function buildContext(
   currentPhase: Phase,
   currentBeat: Beat | null,
 ): BuiltContext {
+  console.log(`[CONTEXT] buildContext called — phase=${state.currentPhaseIndex}, beat=${state.currentBeatIndex}`);
+
   const layers: string[] = [];
 
   // Layer 1: World rules + character card
-  layers.push(buildWorldAndCharacterLayer(config));
+  const layer1 = buildWorldAndCharacterLayer(config);
+  layers.push(layer1);
+  console.log(`[CONTEXT] Layer 1 (world+character): ${layer1.length} chars (~${Math.round(layer1.length / 4)} tokens)`);
 
   // Layer 2: Current phase override
-  layers.push(buildPhaseOverrideLayer(config, currentPhase, currentBeat));
+  const layer2 = buildPhaseOverrideLayer(config, currentPhase, currentBeat);
+  layers.push(layer2);
+  console.log(`[CONTEXT] Layer 2 (phase override): ${layer2.length} chars (~${Math.round(layer2.length / 4)} tokens)`);
 
   // Layer 3: Recent exchange summary
-  layers.push(buildRecentExchangeLayer(state));
+  const layer3 = buildRecentExchangeLayer(state);
+  layers.push(layer3);
+  console.log(`[CONTEXT] Layer 3 (recent exchanges): ${layer3.length} chars (~${Math.round(layer3.length / 4)} tokens)`);
 
   // Layer 4: Compressed history
-  layers.push(buildCompressedHistoryLayer(state));
+  const layer4 = buildCompressedHistoryLayer(state);
+  layers.push(layer4);
+  console.log(`[CONTEXT] Layer 4 (compressed history): ${layer4.length} chars (~${Math.round(layer4.length / 4)} tokens)`);
 
   // Layer 5: Active state snapshot
-  layers.push(buildStateSnapshotLayer(state, currentPhase));
+  const layer5 = buildStateSnapshotLayer(state, currentPhase);
+  layers.push(layer5);
+  console.log(`[CONTEXT] Layer 5 (state snapshot): ${layer5.length} chars (~${Math.round(layer5.length / 4)} tokens)`);
 
   const systemPrompt = layers.filter(Boolean).join("\n\n---\n\n");
+  console.log(`[CONTEXT] Final system prompt: ${systemPrompt.length} chars (~${Math.round(systemPrompt.length / 4)} tokens)`);
 
   // User prefix — response length constraint injected per call
   const userPrefix = config.prompts.system.responseLengthConstraint || "";

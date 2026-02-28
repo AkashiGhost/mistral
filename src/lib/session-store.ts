@@ -31,7 +31,9 @@ function evictStale() {
 }
 
 export function getSession(conversationId: string): SessionData | undefined {
-  return sessions.get(conversationId);
+  const session = sessions.get(conversationId);
+  console.log(`[SESSION] Get: cid=${conversationId}, found=${session !== undefined}`);
+  return session;
 }
 
 export function createSession(conversationId: string, initialState: StoryState): SessionData {
@@ -44,6 +46,8 @@ export function createSession(conversationId: string, initialState: StoryState):
     createdAt: Date.now(),
   };
   sessions.set(conversationId, session);
+  console.log(`[SESSION] Create: cid=${conversationId}`);
+  console.log(`[SESSION] Active sessions: ${sessions.size}`);
   return session;
 }
 
@@ -53,6 +57,7 @@ export function updateSession(
 ): void {
   const existing = sessions.get(conversationId);
   if (existing) {
+    console.log(`[SESSION] Update: cid=${conversationId}, changes=${JSON.stringify(Object.keys(updates))}`);
     sessions.set(conversationId, { ...existing, ...updates });
   }
 }

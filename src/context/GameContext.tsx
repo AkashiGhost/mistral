@@ -61,10 +61,52 @@ type UIAction =
   | { type: "GAME_OVER" };
 
 function uiReducer(state: UIState, action: UIAction): UIState {
+  // ── Reducer logging ────────────────────────────────────────────
+  switch (action.type) {
+    case "SET_STATUS":
+      console.log(`[GAME] Reducer: SET_STATUS → ${action.status} (current: ${state.status})`);
+      break;
+    case "SET_CONVERSATION_ID":
+      console.log(`[GAME] Reducer: SET_CONVERSATION_ID → ${action.id ?? "null"}`);
+      break;
+    case "STATE_POLL":
+      console.log("[GAME] Reducer: STATE_POLL payload:", {
+        phase: action.payload.phase,
+        beatIndex: action.payload.beatIndex,
+        trustLevel: action.payload.trustLevel,
+        activeChoice: action.payload.activeChoice ? "(present)" : null,
+        soundCues: Array.isArray(action.payload.soundCues)
+          ? `${(action.payload.soundCues as unknown[]).length} cue(s)`
+          : "none",
+        gameOver: action.payload.gameOver,
+      });
+      break;
+    case "CLEAR_CHOICE":
+      console.log("[GAME] Reducer: CLEAR_CHOICE");
+      break;
+    case "ELARA_TEXT":
+      console.log(`[GAME] Reducer: ELARA_TEXT → "${action.text.slice(0, 80)}${action.text.length > 80 ? "…" : ""}"`);
+      break;
+    case "ADD_SOUND_CUES":
+      console.log(`[GAME] Reducer: ADD_SOUND_CUES → ${action.cues.length} cue(s):`, action.cues);
+      break;
+    case "CLEAR_SOUND_CUES":
+      console.log("[GAME] Reducer: CLEAR_SOUND_CUES");
+      break;
+    case "GAME_OVER":
+      console.log("[GAME] Reducer: GAME_OVER");
+      break;
+    default:
+      break;
+  }
+
   switch (action.type) {
     case "SET_STATUS":
       // Don't overwrite "ended" with "idle" (ElevenLabs fires onDisconnect after game over)
-      if (state.status === "ended" && action.status === "idle") return state;
+      if (state.status === "ended" && action.status === "idle") {
+        console.log("[GAME] Reducer: SET_STATUS ignored — already ended");
+        return state;
+      }
       return { ...state, status: action.status };
     case "SET_CONVERSATION_ID":
       return { ...state, conversationId: action.id };
@@ -120,6 +162,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // ── Stop polling helper ───────────────────────────────────────
   const stopPolling = useCallback(() => {
     if (pollIntervalRef.current !== null) {
+      console.log("[GAME] Stopping poll interval");
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
@@ -129,10 +172,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const pollGameState = useCallback(async () => {
     const cid = conversationIdRef.current;
     if (!cid) return;
+    console.log(`[GAME] Polling state for cid=${cid}`);
     try {
       const res = await fetch(`/api/game-state?cid=${cid}`);
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn(`[GAME] Poll returned non-OK status: ${res.status}`);
+        return;
+      }
       const data = (await res.json()) as Record<string, unknown>;
+      console.log("[GAME] Poll response data:", data);
 
       dispatch({ type: "STATE_POLL", payload: data });
 
@@ -144,17 +192,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       if (data.gameOver) {
+        console.log("[GAME] Game over detected");
         dispatch({ type: "GAME_OVER" });
         stopPolling();
       }
-    } catch {
+    } catch (err) {
       // Non-critical — continue polling
+      console.warn("[GAME] Poll fetch error (non-critical):", err);
     }
   }, [stopPolling]);
 
   // ── ElevenLabs ConvAI hook ────────────────────────────────────
   const conversation = useConversation({
     onConnect: () => {
+      console.log("[GAME] Connected to ElevenLabs, starting poll");
       dispatch({ type: "SET_STATUS", status: "playing" });
       // Poll every 3s for choices / state events
       if (pollIntervalRef.current === null) {
@@ -162,11 +213,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     },
     onDisconnect: () => {
+      console.log("[GAME] Disconnected from ElevenLabs");
       stopPolling();
       // SET_STATUS "idle" is ignored by reducer when status is already "ended"
       dispatch({ type: "SET_STATUS", status: "idle" });
     },
     onMessage: ({ message, source }: { message: string; source: string }) => {
+      console.log(`[GAME] Message from ${source}: "${message.slice(0, 100)}${message.length > 100 ? "…" : ""}"`);
       if (source === "ai" && message) {
         dispatch({ type: "ELARA_TEXT", text: message });
         // Immediate poll after each AI turn to pick up choices instantly
@@ -174,10 +227,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
     },
     onModeChange: ({ mode }: { mode: string }) => {
+      console.log(`[GAME] Mode changed to: ${mode}`);
       // mode is "speaking" or "listening" — we already track isSpeaking from the hook
     },
     onError: (message: string) => {
-      console.error("[ElevenLabs]", message);
+      console.error("[GAME] ERROR:", message);
       dispatch({ type: "SET_STATUS", status: "error" });
       stopPolling();
     },
@@ -189,34 +243,40 @@ export function GameProvider({ children }: { children: ReactNode }) {
     try {
       const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
       if (!agentId) {
-        console.error("[GameContext] NEXT_PUBLIC_ELEVENLABS_AGENT_ID not set");
+        console.error("[GAME] NEXT_PUBLIC_ELEVENLABS_AGENT_ID not set");
         dispatch({ type: "SET_STATUS", status: "error" });
         return;
       }
+      console.log(`[GAME] Starting session with agentId=${agentId}`);
 
       // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
-      } catch {
-        console.error("[GameContext] Microphone permission denied");
+        console.log("[GAME] Mic permission granted");
+      } catch (err) {
+        console.error("[GAME] Microphone permission denied:", err);
         dispatch({ type: "SET_STATUS", status: "error" });
         return;
       }
 
+      const overrides = {
+        agent: {
+          prompt: {
+            prompt:
+              "You are Elara. Your actual personality and story instructions are provided by the custom LLM server. Simply relay the responses from the custom LLM naturally. Do not add your own personality or instructions beyond what the LLM provides.",
+          },
+          firstMessage:
+            "Thank you for seeing me tonight, doctor. The building is strange at this hour — I don't think I've ever heard it this quiet.",
+        },
+      };
+      console.log("[GAME] conversation.startSession overrides:", overrides);
+
       const cid = await conversation.startSession({
         agentId,
         connectionType: "webrtc",
-        overrides: {
-          agent: {
-            prompt: {
-              prompt:
-                "You are Elara. Your actual personality and story instructions are provided by the custom LLM server. Simply relay the responses from the custom LLM naturally. Do not add your own personality or instructions beyond what the LLM provides.",
-            },
-            firstMessage:
-              "Thank you for seeing me tonight, doctor. The building is strange at this hour — I don't think I've ever heard it this quiet.",
-          },
-        },
+        overrides,
       });
+      console.log(`[GAME] Session started, conversationId=${cid}`);
       conversationIdRef.current = cid;
       dispatch({ type: "SET_CONVERSATION_ID", id: cid });
 
@@ -226,14 +286,16 @@ export function GameProvider({ children }: { children: ReactNode }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: cid }),
       });
+      console.log("[GAME] Game state initialized");
     } catch (err) {
-      console.error("[GameContext] Failed to start session:", err);
+      console.error("[GAME] Failed to start session:", err);
       dispatch({ type: "SET_STATUS", status: "error" });
     }
   }, [conversation]);
 
   // ── End session ───────────────────────────────────────────────
   const endSession = useCallback(async () => {
+    console.log("[GAME] Ending session");
     stopPolling();
     await conversation.endSession();
     conversationIdRef.current = null;
@@ -244,6 +306,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // ── Select narrative choice ───────────────────────────────────
   const selectChoice = useCallback(
     async (beatId: string, optionId: string) => {
+      console.log(`[GAME] Choice selected: beat=${beatId}, option=${optionId}`);
       dispatch({ type: "CLEAR_CHOICE" });
       const cid = conversationIdRef.current;
       if (!cid) return;

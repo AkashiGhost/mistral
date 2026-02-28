@@ -43,5 +43,11 @@ export function parseSoundCues(text: string): ParsedResponse {
     .replace(/\s{2,}/g, " ")
     .trim();
 
+  if (cues.length > 0) {
+    console.log(
+      `[SOUND-PARSER] Found ${cues.length} cues: ${cues.map((c) => c.soundId).join(", ")}`,
+    );
+  }
+
   return { cleanText, cues };
 }

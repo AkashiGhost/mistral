@@ -21,7 +21,7 @@ import { STYLE_TIE_BREAK_ORDER } from "./types/story-state";
 /** Create initial game state from config */
 export function initState(config: GameConfig): StoryState {
   const elara = config.characters[0];
-  return {
+  const state: StoryState = {
     status: "playing",
     currentPhaseIndex: 0,
     currentBeatIndex: 0,
@@ -47,6 +47,8 @@ export function initState(config: GameConfig): StoryState {
     conversationHistory: [],
     soundsRemoved: [],
   };
+  console.log(`[STATE] Init: phase=${state.currentPhaseIndex}, beat=${state.currentBeatIndex}`);
+  return state;
 }
 
 /** Get current phase from config */
@@ -75,7 +77,12 @@ export function advanceBeat(
   _config: GameConfig,
   state: StoryState,
 ): StoryState {
-  return { ...state, currentBeatIndex: state.currentBeatIndex + 1 };
+  const nextBeatIndex = state.currentBeatIndex + 1;
+  console.log(
+    `[STATE] Advance: phase ${state.currentPhaseIndex} → ${state.currentPhaseIndex}, ` +
+    `beat ${state.currentBeatIndex} → ${nextBeatIndex}`,
+  );
+  return { ...state, currentBeatIndex: nextBeatIndex };
 }
 
 /** Advance to the next phase */
@@ -87,6 +94,10 @@ export function advancePhase(
 
   // Game over — no more phases
   if (nextPhaseIndex >= config.arc.phases.length) {
+    console.log(
+      `[STATE] Advance: phase ${state.currentPhaseIndex} → ended (no more phases), ` +
+      `beat ${state.currentBeatIndex} → 0`,
+    );
     return { ...state, status: "ended" };
   }
 
@@ -101,6 +112,11 @@ export function advancePhase(
   if (nextPhaseIndex === 3 && !revelationVariant) {
     revelationVariant = calculateRevelationVariant(config, state);
   }
+
+  console.log(
+    `[STATE] Advance: phase ${state.currentPhaseIndex} → ${nextPhaseIndex}, ` +
+    `beat ${state.currentBeatIndex} → 0`,
+  );
 
   return {
     ...state,
@@ -138,6 +154,14 @@ export function resolveChoice(
   if (option.styleScore) {
     newState = applyStyleScore(newState, option.styleScore);
   }
+
+  const changes = {
+    ...(option.stateChanges ?? {}),
+    ...(option.styleScore ? { styleScore: option.styleScore } : {}),
+  };
+  console.log(
+    `[STATE] Choice resolved: beat=${beatId}, option=${optionId}, state changes=${JSON.stringify(changes)}`,
+  );
 
   return newState;
 }
@@ -326,9 +350,11 @@ export function evaluateEndingCondition(
 ): string | null {
   for (const condition of config.arc.endingConditions) {
     if (matchesEndingTrigger(condition, state)) {
+      console.log(`[STATE] Ending check: result=${condition.id}`);
       return condition.id;
     }
   }
+  console.log(`[STATE] Ending check: result=none`);
   return null;
 }
 

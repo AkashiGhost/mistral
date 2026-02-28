@@ -21,6 +21,8 @@ export class MistralIntentParser implements IntentParser {
   }
 
   async parse(playerText: string): Promise<IntentResult> {
+    console.log(`[INTENT] parse called — input: "${playerText.slice(0, 100)}${playerText.length > 100 ? "..." : ""}"`);
+
     const prompt = `You are an intent classifier for a voice-based horror therapy game.
 The player is a therapist speaking to a patient named Elara.
 
@@ -37,6 +39,7 @@ Return JSON:
 }`;
 
     try {
+      console.log(`[INTENT] Calling Mistral Small (${INTENT_MODEL}) for intent classification`);
       const response = await this.client.chat.complete({
         model: INTENT_MODEL,
         messages: [{ role: "user", content: prompt }],
@@ -44,17 +47,23 @@ Return JSON:
       });
 
       const text = String(response.choices?.[0]?.message?.content ?? "").trim();
+      console.log(`[INTENT] Raw response from Mistral Small: "${text.slice(0, 300)}"`);
+
       const jsonStr = text.replace(/^```json?\s*\n?/i, "").replace(/\n?```\s*$/i, "");
       const parsed = JSON.parse(jsonStr);
 
-      return {
+      const result: IntentResult = {
         intent: (parsed.intent as IntentType) ?? "other",
         emotionalRegister: (parsed.emotionalRegister as EmotionalRegister) ?? "neutral",
         keyPhrase: (parsed.keyPhrase as string) ?? playerText,
         challengeLevel: (parsed.challengeLevel as ChallengeLevel) ?? "medium",
         rawInput: playerText,
       };
-    } catch {
+      console.log(`[INTENT] Parsed result: intent="${result.intent}", emotionalRegister="${result.emotionalRegister}", challengeLevel="${result.challengeLevel}", keyPhrase="${result.keyPhrase}"`);
+      return result;
+    } catch (err) {
+      const error = err as Error;
+      console.error(`[INTENT] Parse failed — ${error.message} — falling back to defaults`);
       return {
         intent: "speak_to_elara",
         emotionalRegister: "neutral",
@@ -93,18 +102,48 @@ export async function* streamMistralStory(
   apiKey: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
 ): AsyncGenerator<string> {
-  const client = new Mistral({ apiKey });
-  const stream = await client.chat.stream({
-    model: STORY_MODEL,
-    messages,
-    temperature: 0.85,
-    maxTokens: 300,
-  });
+  console.log(`[MISTRAL] streamMistralStory called — model=${STORY_MODEL}, messageCount=${messages.length}, temperature=0.85, maxTokens=300`);
 
-  for await (const event of stream) {
-    const delta = event.data?.choices?.[0]?.delta;
-    if (delta?.content && typeof delta.content === "string") {
-      yield delta.content;
-    }
+  const client = new Mistral({ apiKey });
+
+  let stream;
+  try {
+    console.log(`[MISTRAL] Opening stream to Mistral API...`);
+    stream = await client.chat.stream({
+      model: STORY_MODEL,
+      messages,
+      temperature: 0.85,
+      maxTokens: 300,
+    });
+    console.log(`[MISTRAL] Stream opened successfully`);
+  } catch (err) {
+    const error = err as Error;
+    console.error(`[MISTRAL] ERROR opening stream: ${error.message}`);
+    console.error(error.stack);
+    throw err;
   }
+
+  let chunkCount = 0;
+  let firstChunkLogged = false;
+
+  try {
+    for await (const event of stream) {
+      const delta = event.data?.choices?.[0]?.delta;
+      if (delta?.content && typeof delta.content === "string") {
+        if (!firstChunkLogged) {
+          console.log(`[MISTRAL] First chunk received — content: "${delta.content}"`);
+          firstChunkLogged = true;
+        }
+        chunkCount++;
+        yield delta.content;
+      }
+    }
+  } catch (err) {
+    const error = err as Error;
+    console.error(`[MISTRAL] ERROR during stream iteration (after ${chunkCount} chunks): ${error.message}`);
+    console.error(error.stack);
+    throw err;
+  }
+
+  console.log(`[MISTRAL] streamMistralStory complete — totalChunksYielded=${chunkCount}`);
 }
