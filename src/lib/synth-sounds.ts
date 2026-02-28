@@ -121,9 +121,9 @@ export async function generateAllSynthSounds(): Promise<SynthSounds> {
   const [rain, hvac, clock, cello_drone, sub_bass, low_tone] =
     await Promise.all([
       // Rain: bandpass filtered noise at 4kHz — sounds like rainfall
-      generateFilteredNoise(8, "bandpass", 4000, 0.5, 0.4),
+      generateFilteredNoise(8, "bandpass", 4000, 0.5, 0.15),
       // HVAC: lowpass filtered noise at 100Hz — low mechanical hum
-      generateFilteredNoise(6, "lowpass", 100, 1.0, 0.3),
+      generateFilteredNoise(6, "lowpass", 100, 1.0, 0.2),
       // Clock: single tick per second
       generateClockTick(),
       // Cello drone: sawtooth at D2 (73.4Hz)

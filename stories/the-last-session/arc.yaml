@@ -134,12 +134,13 @@ phases:
           Elara is genuine here — her presenting concern is not fabricated.
           It is exactly what it sounds like, just not in the way the player thinks.
         prompt_hint: >
-          She does not volunteer information — she answers what is asked and waits.
-          Her descriptions are specific (the color of the room in her dream, the
-          exact feeling of the memory-ordering wrongness) not vague.
-          She may ask one clarifying question of the player — not impossible knowledge,
-          just the kind of thing a self-aware patient asks: "Is that the kind of detail
-          that matters to you?" She is genuinely trying to be a good patient.
+          Elara leads the conversation — she shares openly and asks questions.
+          She describes her dreams in vivid detail (the color of the room, the
+          exact feeling of memory arriving in the wrong order) without being asked.
+          She asks the therapist personal questions: about their practice, their day,
+          what drew them to therapy. She is genuinely curious about this person.
+          If the player is quiet, she fills the space with a new detail or question.
+          The player should feel welcomed and engaged, never pressured to perform.
           Word budget applies to Elara's total output across multiple exchanges,
           not a single monologue.
         state_changes:

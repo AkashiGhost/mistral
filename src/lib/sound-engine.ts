@@ -47,6 +47,7 @@ export class SoundEngine {
   private timelineTimer: ReturnType<typeof setInterval> | null = null;
   private startTime = 0;
   private firedEvents = new Set<number>();
+  private pausedAt: number | null = null;
   private config: SoundEngineConfig;
   private isDucking = false;
 
@@ -398,6 +399,52 @@ export class SoundEngine {
       console.log("[SOUND] stopTimeline()");
       clearInterval(this.timelineTimer);
       this.timelineTimer = null;
+    }
+  }
+
+  /** Pause all audio — suspends AudioContext and stops timeline */
+  pauseAudio(): void {
+    if (!this.ctx || this.pausedAt !== null) return;
+    console.log("[SOUND] pauseAudio()");
+    this.pausedAt = Date.now();
+    // Stop timeline interval so no events fire during pause
+    if (this.timelineTimer) {
+      clearInterval(this.timelineTimer);
+      this.timelineTimer = null;
+    }
+    // Suspend AudioContext — freezes all sources mid-playback
+    void this.ctx.suspend();
+  }
+
+  /** Resume audio — resumes AudioContext and restarts timeline from paused position */
+  resumeAudio(): void {
+    if (!this.ctx || this.pausedAt === null) return;
+    const pauseDuration = Date.now() - this.pausedAt;
+    console.log(`[SOUND] resumeAudio() — paused for ${(pauseDuration / 1000).toFixed(1)}s`);
+    // Shift startTime forward by pause duration so elapsed calc stays correct
+    this.startTime += pauseDuration;
+    this.pausedAt = null;
+    // Resume AudioContext — all sources resume mid-playback
+    void this.ctx.resume();
+    // Restart timeline interval
+    if (this.timeline.length > 0) {
+      this.timelineTimer = setInterval(() => {
+        const elapsed = (Date.now() - this.startTime) / 1000;
+        for (let i = 0; i < this.timeline.length; i++) {
+          if (this.firedEvents.has(i)) continue;
+          const event = this.timeline[i];
+          if (elapsed >= event.time) {
+            this.firedEvents.add(i);
+            console.log(`[SOUND] Timeline event fired at t=${elapsed.toFixed(1)}s:`, {
+              action: event.action,
+              soundId: event.soundId,
+              soundIds: event.soundIds,
+              time: event.time,
+            });
+            this.executeTimelineEvent(event);
+          }
+        }
+      }, 100);
     }
   }
 

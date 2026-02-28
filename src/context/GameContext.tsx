@@ -30,10 +30,13 @@ interface GameContextValue {
   hasElaraSpoken: boolean;
   /** Whether Elara is currently speaking (ElevenLabs TTS) */
   isSpeaking: boolean;
+  /** Whether the game is paused */
+  isPaused: boolean;
   startSession: () => Promise<void>;
   endSession: () => Promise<void>;
   selectChoice: (beatId: string, optionId: string) => void;
   clearSoundCues: () => void;
+  togglePause: () => void;
   conversationId: string | null;
 }
 
@@ -47,6 +50,7 @@ type UIState = {
   lastElaraText: string;
   pendingSoundCues: Array<{ soundId: string; position: number }>;
   hasElaraSpoken: boolean;
+  isPaused: boolean;
   conversationId: string | null;
 };
 
@@ -58,7 +62,8 @@ type UIAction =
   | { type: "ELARA_TEXT"; text: string }
   | { type: "ADD_SOUND_CUES"; cues: Array<{ soundId: string; position: number }> }
   | { type: "CLEAR_SOUND_CUES" }
-  | { type: "GAME_OVER" };
+  | { type: "GAME_OVER" }
+  | { type: "TOGGLE_PAUSE" };
 
 function uiReducer(state: UIState, action: UIAction): UIState {
   // ── Reducer logging ────────────────────────────────────────────
@@ -95,6 +100,9 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       break;
     case "GAME_OVER":
       console.log("[GAME] Reducer: GAME_OVER");
+      break;
+    case "TOGGLE_PAUSE":
+      console.log(`[GAME] Reducer: TOGGLE_PAUSE → ${!state.isPaused}`);
       break;
     default:
       break;
@@ -134,6 +142,8 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       return { ...state, pendingSoundCues: [] };
     case "GAME_OVER":
       return { ...state, status: "ended", activeChoice: null };
+    case "TOGGLE_PAUSE":
+      return { ...state, isPaused: !state.isPaused };
     default:
       return state;
   }
@@ -149,6 +159,7 @@ const initialUIState: UIState = {
   lastElaraText: "",
   pendingSoundCues: [],
   hasElaraSpoken: false,
+  isPaused: false,
   conversationId: null,
 };
 
@@ -324,6 +335,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "CLEAR_SOUND_CUES" });
   }, []);
 
+  // ── Toggle pause ────────────────────────────────────────────
+  const togglePause = useCallback(() => {
+    const willPause = !state.isPaused;
+    dispatch({ type: "TOGGLE_PAUSE" });
+    // Mute/unmute ElevenLabs TTS output
+    if (willPause) {
+      conversation.setVolume({ volume: 0 });
+    } else {
+      conversation.setVolume({ volume: 1 });
+    }
+  }, [state.isPaused, conversation]);
+
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
     return () => {
@@ -338,6 +361,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     endSession,
     selectChoice,
     clearSoundCues,
+    togglePause,
     conversationId: state.conversationId,
   };
 

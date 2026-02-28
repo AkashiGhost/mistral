@@ -15,7 +15,7 @@ import {
   createSession,
   updateSession,
 } from "@/lib/session-store";
-import { initState, getCurrentBeat, advanceBeat, evaluateEndingCondition, resolveChoice } from "@/lib/state-machine";
+import { initState, getCurrentBeat, advanceBeat, advancePhase, evaluateEndingCondition, resolveChoice } from "@/lib/state-machine";
 import { buildContext } from "@/lib/llm/context-builder";
 import { parseSoundCues } from "@/lib/sound-cue-parser";
 import { callMistralStory, streamMistralStory, MistralIntentParser } from "@/lib/llm/mistral-adapter";
@@ -313,10 +313,21 @@ async function performPostStreamUpdates(
       elapsedSeconds: state.elapsedSeconds + 30, // rough approximation per turn
     };
 
-    // ── Advance beat ──────────────────────────────────────────────
+    // ── Advance beat + check phase transition ─────────────────────
     const prevBeatIndex = nextState.currentBeatIndex;
     const prevPhaseIndex = nextState.currentPhaseIndex;
     nextState = advanceBeat(config, nextState);
+
+    // If beats are exhausted in current phase, advance to next phase
+    // (mirrors game-orchestrator's checkPhaseTransition logic)
+    const beatAfterAdvance = getCurrentBeat(config, nextState);
+    if (!beatAfterAdvance) {
+      console.log(
+        `[WEBHOOK] Phase ${nextState.currentPhaseIndex} beats exhausted (beatIndex=${nextState.currentBeatIndex}) — transitioning to next phase`,
+      );
+      nextState = advancePhase(config, nextState);
+    }
+
     const beatAdvanced =
       nextState.currentBeatIndex !== prevBeatIndex || nextState.currentPhaseIndex !== prevPhaseIndex;
     console.log(

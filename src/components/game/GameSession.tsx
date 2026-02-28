@@ -15,9 +15,11 @@ export function GameSession() {
     status,
     lastElaraText,
     isSpeaking,
+    isPaused,
     hasElaraSpoken,
     activeChoice,
     endSession,
+    togglePause,
     pendingSoundCues,
     clearSoundCues,
   } = useGame();
@@ -26,6 +28,7 @@ export function GameSession() {
   useSoundEngine({
     status,
     isSpeaking,
+    isPaused,
     pendingSoundCues,
     clearSoundCues,
   });
@@ -235,14 +238,83 @@ export function GameSession() {
         </div>
       )}
 
-      {/* End session — barely visible, for edge cases */}
+      {/* Pause overlay */}
+      {isPaused && (
+        <div
+          className="fade-in"
+          style={{
+            position: "fixed",
+            inset: 0,
+            backgroundColor: "rgba(0, 0, 0, 0.85)",
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: "var(--space-6)",
+            zIndex: 50,
+          }}
+        >
+          <p
+            style={{
+              color: "var(--color-text-secondary)",
+              fontSize: "var(--font-size-lg)",
+              fontFamily: "var(--font-body)",
+              fontStyle: "italic",
+              margin: 0,
+            }}
+          >
+            session paused
+          </p>
+          <button
+            type="button"
+            onClick={togglePause}
+            style={{
+              background: "none",
+              border: "1px solid var(--color-text-muted)",
+              color: "var(--color-text-primary)",
+              fontSize: "var(--font-size-base)",
+              fontFamily: "var(--font-ui)",
+              cursor: "pointer",
+              padding: "var(--space-3) var(--space-6)",
+              borderRadius: "var(--radius-md)",
+              letterSpacing: "0.04em",
+              minHeight: 48,
+              minWidth: 120,
+            }}
+          >
+            resume
+          </button>
+        </div>
+      )}
+
+      {/* Bottom controls */}
       <div
         style={{
           padding: "var(--space-3)",
           textAlign: "center",
           borderTop: "1px solid var(--color-bg-elevated)",
+          display: "flex",
+          justifyContent: "center",
+          gap: "var(--space-4)",
         }}
       >
+        <button
+          type="button"
+          onClick={togglePause}
+          style={{
+            background: "none",
+            border: "none",
+            color: "var(--color-text-muted)",
+            fontSize: "0.65rem",
+            fontFamily: "var(--font-ui)",
+            cursor: "pointer",
+            opacity: 0.35,
+            padding: "var(--space-1)",
+            letterSpacing: "0.04em",
+          }}
+        >
+          pause
+        </button>
         <button
           type="button"
           onClick={() => {

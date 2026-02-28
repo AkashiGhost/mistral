@@ -36,6 +36,8 @@ interface UseSoundEngineOptions {
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   /** Whether Elara is currently speaking (for TTS ducking) */
   isSpeaking: boolean;
+  /** Whether the game is paused */
+  isPaused: boolean;
   /** Sound cues from game state polling */
   pendingSoundCues: Array<{ soundId: string; position: number }>;
   /** Clear processed sound cues */
@@ -45,6 +47,7 @@ interface UseSoundEngineOptions {
 export function useSoundEngine({
   status,
   isSpeaking,
+  isPaused,
   pendingSoundCues,
   clearSoundCues,
 }: UseSoundEngineOptions) {
@@ -113,6 +116,18 @@ export function useSoundEngine({
       engine.stopDucking();
     }
   }, [isSpeaking]);
+
+  // ── Pause / Resume ambient audio ─────────────────────────
+  useEffect(() => {
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    if (isPaused) {
+      engine.pauseAudio();
+    } else {
+      engine.resumeAudio();
+    }
+  }, [isPaused]);
 
   // ── Process pending sound cues from game state ────────────
   useEffect(() => {
