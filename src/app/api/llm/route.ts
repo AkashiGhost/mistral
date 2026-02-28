@@ -6,7 +6,7 @@
 // ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { loadStory } from "@/lib/story-loader";
+import { getGameConfig } from "@/lib/config-loader";
 import {
   getSession,
   createSession,
@@ -17,14 +17,15 @@ import { buildContext } from "@/lib/llm/context-builder";
 import { parseSoundCues } from "@/lib/sound-cue-parser";
 import { callMistralStory, MistralIntentParser } from "@/lib/llm/mistral-adapter";
 import type { ConversationTurn } from "@/lib/types/story-state";
+import type { GameConfig } from "@/lib/types/game-config";
 
 // Must be Node.js runtime — Edge does not support module-level Map persistence
 export const runtime = "nodejs";
 
 // Cache story config across requests (loaded once per warm instance)
-let storyConfig: Awaited<ReturnType<typeof loadStory>> | null = null;
-function getConfig() {
-  if (!storyConfig) storyConfig = loadStory();
+let storyConfig: GameConfig | null = null;
+function getConfig(): GameConfig {
+  if (!storyConfig) storyConfig = getGameConfig();
   return storyConfig;
 }
 
@@ -120,13 +121,12 @@ export async function POST(req: NextRequest) {
     // ── Check for beat with choices — surface to client via polling ──
     const nextBeat = getCurrentBeat(config, nextState);
     let pendingChoice = session.pendingChoice;
-    if (nextBeat?.type === "choice" && nextBeat.choices && !pendingChoice) {
+    if (nextBeat?.type === "choice" && nextBeat.options && !pendingChoice) {
       pendingChoice = {
         beatId: nextBeat.id,
-        choices: nextBeat.choices.map((c) => ({
+        options: nextBeat.options.map((c) => ({
           id: c.id,
           label: c.label,
-          shortLabel: c.shortLabel ?? c.label,
         })),
       };
     }

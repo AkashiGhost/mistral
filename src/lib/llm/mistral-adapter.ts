@@ -2,7 +2,7 @@
 // Mistral Adapter — Large for story + Small for intent
 // ─────────────────────────────────────────────
 
-import Mistral from "@mistralai/mistralai";
+import { Mistral } from "@mistralai/mistralai";
 import type { IntentParser } from "../types/llm";
 import type { IntentResult, IntentType, EmotionalRegister, ChallengeLevel } from "../types/intent";
 

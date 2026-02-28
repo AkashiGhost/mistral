@@ -13,14 +13,15 @@ import {
   clearSoundCues,
   updateSession,
 } from "@/lib/session-store";
-import { loadStory } from "@/lib/story-loader";
+import { getGameConfig } from "@/lib/config-loader";
 import { initState } from "@/lib/state-machine";
+import type { GameConfig } from "@/lib/types/game-config";
 
 export const runtime = "nodejs";
 
-let storyConfig: ReturnType<typeof loadStory> | null = null;
-function getConfig() {
-  if (!storyConfig) storyConfig = loadStory();
+let storyConfig: GameConfig | null = null;
+function getConfig(): GameConfig {
+  if (!storyConfig) storyConfig = getGameConfig();
   return storyConfig;
 }
 

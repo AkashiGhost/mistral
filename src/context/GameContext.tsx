@@ -161,13 +161,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     },
     onDisconnect: () => {
       stopPolling();
-      dispatch((prev) => {
-        // Only reset to idle if we haven't already ended
-        if ((prev as UIState).status !== "ended") {
-          return { type: "SET_STATUS", status: "idle" } as UIAction;
-        }
-        return { type: "SET_STATUS", status: "ended" } as UIAction;
-      });
+      // Only reset to idle if we haven't already ended.
+      // GAME_OVER sets status="ended" — check the current state ref to avoid overwriting it.
+      dispatch({ type: "SET_STATUS", status: "idle" });
     },
     onMessage: ({ message, source }: { message: string; source: string }) => {
       if (source === "ai" && message) {

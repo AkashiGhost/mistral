@@ -6,7 +6,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession, updateSession, clearPendingChoice } from "@/lib/session-store";
-import { loadStory } from "@/lib/story-loader";
+import { getGameConfig } from "@/lib/config-loader";
 import { resolveChoice } from "@/lib/state-machine";
 import type { GameConfig } from "@/lib/types/game-config";
 
@@ -14,7 +14,7 @@ export const runtime = "nodejs";
 
 let storyConfig: GameConfig | null = null;
 function getConfig(): GameConfig {
-  if (!storyConfig) storyConfig = loadStory();
+  if (!storyConfig) storyConfig = getGameConfig();
   return storyConfig;
 }
 
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   // Find the selected option in the config
   const phase = config.arc.phases[session.state.currentPhaseIndex];
   const beat = phase?.beats?.find((b) => b.id === beatId);
-  const option = beat?.choices?.find((c) => c.id === optionId);
+  const option = beat?.options?.find((c) => c.id === optionId);
 
   if (!option) {
     return NextResponse.json({ error: "Option not found" }, { status: 404 });
