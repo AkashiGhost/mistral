@@ -83,3 +83,28 @@ export async function callMistralStory(
   });
   return String(response.choices?.[0]?.message?.content ?? "");
 }
+
+// ─────────────────────────────────────────────
+// Streaming story call — yields text chunks as
+// they arrive from Mistral for real-time SSE
+// ─────────────────────────────────────────────
+
+export async function* streamMistralStory(
+  apiKey: string,
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
+): AsyncGenerator<string> {
+  const client = new Mistral({ apiKey });
+  const stream = await client.chat.stream({
+    model: STORY_MODEL,
+    messages,
+    temperature: 0.85,
+    maxTokens: 300,
+  });
+
+  for await (const event of stream) {
+    const delta = event.data?.choices?.[0]?.delta;
+    if (delta?.content && typeof delta.content === "string") {
+      yield delta.content;
+    }
+  }
+}

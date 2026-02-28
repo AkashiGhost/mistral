@@ -18,8 +18,9 @@ import {
 import { initState, getCurrentBeat, advanceBeat, evaluateEndingCondition, resolveChoice } from "@/lib/state-machine";
 import { buildContext } from "@/lib/llm/context-builder";
 import { parseSoundCues } from "@/lib/sound-cue-parser";
-import { callMistralStory, MistralIntentParser } from "@/lib/llm/mistral-adapter";
-import type { ConversationTurn } from "@/lib/types/story-state";
+import { callMistralStory, streamMistralStory, MistralIntentParser } from "@/lib/llm/mistral-adapter";
+import type { ConversationTurn, StoryState } from "@/lib/types/story-state";
+import type { SessionData } from "@/lib/session-store";
 import type { GameConfig, Beat, ChoiceOption } from "@/lib/types/game-config";
 
 // Must be Node.js runtime — Edge does not support module-level Map persistence
@@ -149,13 +150,107 @@ export async function POST(req: NextRequest) {
         .map((m) => ({ role: m.role, content: m.content })),
     ];
 
-    // ── Call Mistral Large ────────────────────────────────────────
-    const rawResponse = await callMistralStory(
-      process.env.MISTRAL_API_KEY!,
-      mistralMessages,
-    );
+    // ── Stream Mistral Large → SSE in real-time ─────────────────
+    // Chunks are forwarded to ElevenLabs as they arrive from Mistral,
+    // eliminating the wait for the full response. State updates
+    // (sound cues, beat advancement, style tracking) run after the
+    // stream completes — the response is already flowing to ElevenLabs.
+    const encoder = new TextEncoder();
+    const sseId = `chatcmpl-${Date.now()}`;
+    const created = Math.floor(Date.now() / 1000);
+    let fullText = "";
 
-    // ── Parse sound cues from response ───────────────────────────
+    // Capture variables needed by the post-stream state update closure
+    const capturedConversationId = conversation_id;
+    const capturedState = state;
+    const capturedSession = session;
+    const capturedConfig = config;
+    const capturedPlayerText = playerText;
+
+    const sseStream = new ReadableStream({
+      async start(controller) {
+        try {
+          let first = true;
+          for await (const chunk of streamMistralStory(
+            process.env.MISTRAL_API_KEY!,
+            mistralMessages,
+          )) {
+            fullText += chunk;
+
+            const data = {
+              id: sseId,
+              object: "chat.completion.chunk",
+              created,
+              model: "mistral-large-latest",
+              choices: [{
+                index: 0,
+                delta: first
+                  ? { role: "assistant" as const, content: chunk }
+                  : { content: chunk },
+                finish_reason: null,
+              }],
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+            first = false;
+          }
+
+          // Finish chunk
+          const finish = {
+            id: sseId,
+            object: "chat.completion.chunk",
+            created,
+            model: "mistral-large-latest",
+            choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+          };
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(finish)}\n\n`));
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+          controller.close();
+
+          // ── Post-stream state updates (fire-and-forget) ──────────
+          // The SSE response is already closed and flowing to ElevenLabs.
+          // State updates run asynchronously so they don't block TTS.
+          void performPostStreamUpdates(
+            capturedConversationId,
+            capturedState,
+            capturedSession,
+            capturedConfig,
+            capturedPlayerText,
+            fullText,
+          );
+        } catch (err) {
+          controller.error(err);
+        }
+      },
+    });
+
+    return new Response(sseStream, {
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+      },
+    });
+  } catch (err) {
+    console.error("[/api/llm/chat/completions]", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+/**
+ * Post-stream state updates — runs after SSE response is sent.
+ * Handles sound cue parsing, conversation history, beat advancement,
+ * ending detection, choice detection, and style tracking.
+ */
+async function performPostStreamUpdates(
+  conversationId: string,
+  state: StoryState,
+  session: SessionData,
+  config: GameConfig,
+  playerText: string,
+  rawResponse: string,
+): Promise<void> {
+  try {
+    // ── Parse sound cues from full accumulated response ─────────
     const { cleanText, cues } = parseSoundCues(rawResponse);
 
     // ── Update conversation history in state ──────────────────────
@@ -175,12 +270,12 @@ export async function POST(req: NextRequest) {
     const endingId = evaluateEndingCondition(config, nextState);
     if (endingId) {
       nextState = { ...nextState, endingId };
-      updateSession(conversation_id, {
+      updateSession(conversationId, {
         state: nextState,
         pendingSoundCues: cues.map((c) => ({ soundId: c.soundId, position: c.position })),
         gameOver: true,
       });
-      return openAiSSEResponse(cleanText);
+      return;
     }
 
     // ── Check for beat with choices — store for voice presentation next turn ──
@@ -196,7 +291,7 @@ export async function POST(req: NextRequest) {
       };
     }
 
-    // ── Classify intent (async, not on hot path — for style tracker) ──
+    // ── Classify intent (async — for style tracker) ──────────────
     let nextStateWithStyle = nextState;
     try {
       const intent = await intentParser.parse(playerText);
@@ -206,7 +301,7 @@ export async function POST(req: NextRequest) {
       // Style tracking is non-critical
     }
 
-    updateSession(conversation_id, {
+    updateSession(conversationId, {
       state: nextStateWithStyle,
       pendingChoice,
       pendingSoundCues: [
@@ -214,11 +309,8 @@ export async function POST(req: NextRequest) {
         ...cues.map((c) => ({ soundId: c.soundId, position: c.position })),
       ],
     });
-
-    return openAiSSEResponse(cleanText);
   } catch (err) {
-    console.error("[/api/llm/chat/completions]", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error("[post-stream state update]", err);
   }
 }
 
