@@ -241,6 +241,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(async () => {
     dispatch({ type: "SET_STATUS", status: "connecting" });
     try {
+      const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
+      if (!agentId) {
+        console.error("[GAME] NEXT_PUBLIC_ELEVENLABS_AGENT_ID not set");
+        dispatch({ type: "SET_STATUS", status: "error" });
+        return;
+      }
+      console.log(`[GAME] Starting session with agentId=${agentId}`);
+
       // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -251,33 +259,13 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Fetch signed URL from our backend (server-side API key auth)
-      // This bypasses the LiveKit WebRTC 404 issue by using WebSocket instead
-      console.log("[GAME] Fetching signed URL from backend...");
-      const signedUrlRes = await fetch("/api/signed-url");
-      if (!signedUrlRes.ok) {
-        console.error(`[GAME] Failed to get signed URL: status=${signedUrlRes.status}`);
-        dispatch({ type: "SET_STATUS", status: "error" });
-        return;
-      }
-      const { signedUrl } = await signedUrlRes.json();
-      console.log(`[GAME] Got signed URL: ${signedUrl?.slice(0, 80)}...`);
-
-      const overrides = {
-        agent: {
-          prompt: {
-            prompt:
-              "You are Elara. Your actual personality and story instructions are provided by the custom LLM server. Simply relay the responses from the custom LLM naturally. Do not add your own personality or instructions beyond what the LLM provides.",
-          },
-          firstMessage:
-            "Thank you for seeing me tonight, doctor. The building is strange at this hour — I don't think I've ever heard it this quiet.",
-        },
-      };
-      console.log("[GAME] conversation.startSession overrides:", overrides);
+      // NO overrides — the Custom LLM webhook replaces the system prompt server-side.
+      // Overrides require dashboard Security tab opt-in; without it they silently kill the session.
+      console.log("[GAME] Starting session (no overrides — webhook handles prompt)");
 
       const cid = await conversation.startSession({
-        signedUrl,
-        overrides,
+        agentId,
+        connectionType: "webrtc",
       });
       console.log(`[GAME] Session started, conversationId=${cid}`);
       conversationIdRef.current = cid;
