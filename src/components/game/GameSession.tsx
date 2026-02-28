@@ -45,8 +45,9 @@ export function GameSession({ storyId }: GameSessionProps) {
 
   const showAtmosphere = ATMOSPHERE_STORIES.has(storyId);
 
-  // ── Sound Engine — ambient sounds, timeline, TTS ducking ──
+  // ── Sound Engine — story-aware ambient sounds, timeline, TTS ducking ──
   useSoundEngine({
+    storyId,
     status,
     isSpeaking,
     isPaused,

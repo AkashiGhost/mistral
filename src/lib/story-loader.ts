@@ -109,9 +109,9 @@ function assembleStory(storyDir: string): RawStory {
   const meta = loadYaml<Record<string, unknown>>(
     path.join(storyDir, "meta.yaml"),
   );
-  const world = loadYaml<Record<string, unknown>>(
+  const world = loadYamlIfExists<Record<string, unknown>>(
     path.join(storyDir, "world.yaml"),
-  );
+  ) ?? {};
   const arc = loadYaml<Record<string, unknown>>(
     path.join(storyDir, "arc.yaml"),
   );
@@ -138,13 +138,13 @@ function assembleStory(storyDir: string): RawStory {
       path.join(storyDir, "prompts", "phase-overrides.yaml"),
     ) ?? {};
 
-  // Sounds
-  const cueMap = loadYaml<Record<string, unknown>>(
+  // Sounds (optional — story may not have sound config yet)
+  const cueMap = loadYamlIfExists<Record<string, unknown>>(
     path.join(storyDir, "sounds", "cue-map.yaml"),
-  );
-  const timelineFile = loadYaml<Record<string, unknown>>(
+  ) ?? {};
+  const timelineFile = loadYamlIfExists<Record<string, unknown>>(
     path.join(storyDir, "sounds", "timeline.yaml"),
-  );
+  ) ?? {};
   const timelineEvents = (timelineFile.timeline as unknown[]) ?? [];
   const timelineMixing = timelineFile.mixing as Record<string, unknown> | undefined;
 
@@ -235,23 +235,27 @@ export function loadStory(
   }
 
   // 2. Validate individual files against their schemas
-  const validation = validateIndividualFiles(schemasDir, [
+  const filesToValidate = [
     {
       label: "arc.yaml",
       data: raw.rawArc,
       schemaId: "https://innerplay.app/schemas/arc-schema.json",
-    },
-    {
-      label: "world.yaml",
-      data: raw.rawWorld,
-      schemaId: "https://innerplay.app/schemas/world-schema.json",
     },
     ...raw.rawCharacters.map((char, i) => ({
       label: `characters[${i}]`,
       data: char,
       schemaId: "https://innerplay.app/schemas/character-schema.json",
     })),
-  ]);
+  ];
+  // Only validate world.yaml if it was present
+  if (Object.keys(raw.rawWorld).length > 0) {
+    filesToValidate.push({
+      label: "world.yaml",
+      data: raw.rawWorld,
+      schemaId: "https://innerplay.app/schemas/world-schema.json",
+    });
+  }
+  const validation = validateIndividualFiles(schemasDir, filesToValidate);
 
   if (!validation.valid) {
     return { errors: validation.errors };
