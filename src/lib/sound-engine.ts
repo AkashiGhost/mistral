@@ -75,6 +75,12 @@ export class SoundEngine {
     console.log(`[SOUND] AudioContext state after init: ${this.ctx.state}, sampleRate=${this.ctx.sampleRate}Hz`);
   }
 
+  /** Register a pre-generated AudioBuffer (e.g. from synthesis) */
+  registerBuffer(id: string, buffer: AudioBuffer): void {
+    this.bufferCache.set(id, buffer);
+    console.log(`[SOUND] Registered buffer: ${id} (${buffer.duration.toFixed(2)}s)`);
+  }
+
   /** Preload audio assets */
   async preload(assets: Array<{ id: string; url: string }>): Promise<void> {
     if (!this.ctx) throw new Error("SoundEngine not initialized");

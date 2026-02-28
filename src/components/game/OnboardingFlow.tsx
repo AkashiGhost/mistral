@@ -8,12 +8,13 @@ interface OnboardingFlowProps {
 
 const STEPS = [
   {
-    title: "Put on headphones",
-    subtitle: "This experience is designed for stereo audio.",
+    title: "You are a therapist",
+    subtitle:
+      "It's late. Your last patient of the night has arrived. Her name is Elara.",
   },
   {
-    title: "Dim the lights",
-    subtitle: "Find a quiet, dark space.",
+    title: "Put on headphones",
+    subtitle: "This is a voice experience — speak naturally and listen closely.",
   },
   {
     title: "Close your eyes",

@@ -259,13 +259,19 @@ export function GameProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // NO overrides — the Custom LLM webhook replaces the system prompt server-side.
-      // Overrides require dashboard Security tab opt-in; without it they silently kill the session.
-      console.log("[GAME] Starting session (no overrides — webhook handles prompt)");
+      // Overrides enabled on dashboard Security tab.
+      // firstMessage: leading "..." gives WebRTC audio time to initialize before first real word.
+      // System prompt NOT overridden — webhook handles it server-side.
+      console.log("[GAME] Starting session with firstMessage override for audio init padding");
 
       const cid = await conversation.startSession({
         agentId,
         connectionType: "webrtc",
+        overrides: {
+          agent: {
+            firstMessage: "... Hello, Doctor. Thank you for seeing me tonight.",
+          },
+        },
       });
       console.log(`[GAME] Session started, conversationId=${cid}`);
       conversationIdRef.current = cid;

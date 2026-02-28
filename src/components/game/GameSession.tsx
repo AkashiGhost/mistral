@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { useGame } from "@/context/GameContext";
+import { useSoundEngine } from "@/hooks/useSoundEngine";
 
 // ─────────────────────────────────────────────
 // Game Session — Mistral / ElevenLabs version
@@ -17,7 +18,17 @@ export function GameSession() {
     hasElaraSpoken,
     activeChoice,
     endSession,
+    pendingSoundCues,
+    clearSoundCues,
   } = useGame();
+
+  // ── Sound Engine — ambient sounds, timeline, TTS ducking ──
+  useSoundEngine({
+    status,
+    isSpeaking,
+    pendingSoundCues,
+    clearSoundCues,
+  });
 
   // ── Mount / unmount logging ──────────────────────────────────
   useEffect(() => {
