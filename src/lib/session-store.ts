@@ -1,0 +1,72 @@
+// ─────────────────────────────────────────────
+// Session store — in-memory, keyed by ElevenLabs conversation_id
+// Lives in Node.js runtime (not Edge) so it persists across requests
+// within the same warm Vercel function instance. Game sessions are
+// 10-12 min max, so cold-start reset is acceptable.
+// ─────────────────────────────────────────────
+
+import type { StoryState } from "./types/story-state";
+import type { ChoicePromptPayload } from "./types/llm";
+
+export interface SessionData {
+  state: StoryState;
+  pendingChoice: ChoicePromptPayload | null;
+  pendingSoundCues: Array<{ soundId: string; position: number }>;
+  gameOver: boolean;
+  createdAt: number;
+}
+
+const sessions = new Map<string, SessionData>();
+
+// 30 min TTL — auto-evict stale sessions
+const SESSION_TTL_MS = 30 * 60 * 1000;
+
+function evictStale() {
+  const now = Date.now();
+  for (const [id, session] of sessions.entries()) {
+    if (now - session.createdAt > SESSION_TTL_MS) {
+      sessions.delete(id);
+    }
+  }
+}
+
+export function getSession(conversationId: string): SessionData | undefined {
+  return sessions.get(conversationId);
+}
+
+export function createSession(conversationId: string, initialState: StoryState): SessionData {
+  evictStale();
+  const session: SessionData = {
+    state: initialState,
+    pendingChoice: null,
+    pendingSoundCues: [],
+    gameOver: false,
+    createdAt: Date.now(),
+  };
+  sessions.set(conversationId, session);
+  return session;
+}
+
+export function updateSession(
+  conversationId: string,
+  updates: Partial<SessionData>,
+): void {
+  const existing = sessions.get(conversationId);
+  if (existing) {
+    sessions.set(conversationId, { ...existing, ...updates });
+  }
+}
+
+export function clearPendingChoice(conversationId: string): void {
+  const existing = sessions.get(conversationId);
+  if (existing) {
+    sessions.set(conversationId, { ...existing, pendingChoice: null });
+  }
+}
+
+export function clearSoundCues(conversationId: string): void {
+  const existing = sessions.get(conversationId);
+  if (existing) {
+    sessions.set(conversationId, { ...existing, pendingSoundCues: [] });
+  }
+}
