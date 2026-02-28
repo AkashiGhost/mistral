@@ -45,7 +45,7 @@ interface LLMWebhookRequest {
   max_tokens?: number;
   stream?: boolean;
   conversation_id?: string;
-  elevenlabs_extra_body?: Record<string, unknown>;
+  custom_llm_extra_body?: Record<string, unknown>;
 }
 
 export async function POST(req: NextRequest) {
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     console.log(`[WEBHOOK] Messages breakdown:`, JSON.stringify(messageSummary));
     console.log(`[WEBHOOK] ElevenLabs system prompt preview (first 200): "${elevenLabsSystemPrompt.slice(0, 200)}"`);
     console.log(`[WEBHOOK] conversation_id from body: ${body.conversation_id ?? "(none)"}`);
-    console.log(`[WEBHOOK] elevenlabs_extra_body present: ${!!body.elevenlabs_extra_body}`);
+    console.log(`[WEBHOOK] custom_llm_extra_body present: ${!!body.custom_llm_extra_body}`);
 
     const { messages } = body;
 
@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
 
     // Extract conversation_id from available sources (priority order)
     let conversation_id = body.conversation_id
-      ?? (body.elevenlabs_extra_body?.conversation_id as string | undefined)
+      ?? (body.custom_llm_extra_body?.conversation_id as string | undefined)
       ?? undefined;
 
     // If no conversation_id available, generate one from the FIRST user message.
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine story ID — from existing session or from request metadata
-    const requestStoryId = (body.elevenlabs_extra_body?.story_id as StoryId | undefined) ?? "the-last-session";
+    const requestStoryId = (body.custom_llm_extra_body?.story_id as StoryId | undefined) ?? "the-last-session";
 
     // Get or init session state
     let session = getSession(conversation_id);
@@ -287,7 +287,26 @@ export async function POST(req: NextRequest) {
           const error = err as Error;
           console.error(`[WEBHOOK] ERROR inside SSE stream: ${error.message}`);
           console.error(error.stack);
-          controller.error(err);
+          // Send a graceful fallback instead of controller.error() which kills
+          // the ElevenLabs connection with no explanation.
+          try {
+            const fallback = {
+              id: sseId, object: "chat.completion.chunk", created,
+              model: "mistral-large-latest",
+              choices: [{ index: 0, delta: { content: "... I need a moment. Let me gather my thoughts." }, finish_reason: null }],
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(fallback)}\n\n`));
+            const finish = {
+              id: sseId, object: "chat.completion.chunk", created,
+              model: "mistral-large-latest",
+              choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(finish)}\n\n`));
+            controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+            controller.close();
+          } catch {
+            controller.error(err);
+          }
         }
       },
     });

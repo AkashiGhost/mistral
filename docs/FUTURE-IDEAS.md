@@ -65,6 +65,17 @@ Make the story upload/creation process itself feel like a game:
 - Collaborative — AI suggests improvements, user accepts/rejects
 - Templates for common genres (horror therapy session, mystery lighthouse, etc.)
 
+## Personalized Scene Images (Face Integration)
+Two-level personalization:
+1. **Profile photo** — user uploads their photo during account setup
+2. **Face-in-scene generation** — onboarding images are generated with the user's face composited into the scene
+   - "You're sitting in Elara's therapy office" — but the image actually shows THEM sitting there
+   - Uses face-swap or image-generation with face reference (e.g., InstantID, IP-Adapter)
+   - Much more immersive — user sees themselves in the story world before closing their eyes
+   - Could generate 2-3 personalized scene images per story on first play
+   - Cache generated images for replay
+   - Privacy: face data stays local or is processed ephemerally, never stored on server
+
 ## Pre-Recorded Gameplay Videos for Marketing
 Record actual gameplay sessions and publish as short-form content:
 - Instagram Reels / TikTok / YouTube Shorts — 30-60 second highlights
