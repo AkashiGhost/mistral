@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
@@ -133,7 +133,9 @@ export default function PlayPage() {
   return (
     <ErrorBoundary>
       <GameProvider>
-        <PlayContent />
+        <Suspense>
+          <PlayContent />
+        </Suspense>
       </GameProvider>
     </ErrorBoundary>
   );
