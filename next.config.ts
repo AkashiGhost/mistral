@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
   // (e.g., `path.join(process.cwd(), "stories", storyId)`), the tracer misses
   // story directories that aren't the default. Explicitly include them all.
   outputFileTracingIncludes: {
-    "/api/*": ["./stories/**/*", "./schemas/**/*"],
+    "/api/**": ["./stories/**/*", "./schemas/**/*"],
   },
 };
 
