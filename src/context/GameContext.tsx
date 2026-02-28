@@ -290,10 +290,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
       console.log(`[GAME] Starting session: agentId=${agentId}, storyId=${resolvedStoryId}`);
 
-      // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt
+      // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt.
+      // IMPORTANT: Release the stream immediately so the SDK can claim the mic cleanly.
       try {
-        await navigator.mediaDevices.getUserMedia({ audio: true });
-        console.log("[GAME] Mic permission granted");
+        const permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        permStream.getTracks().forEach((t) => t.stop());
+        console.log("[GAME] Mic permission granted (stream released for SDK)");
       } catch (err) {
         console.error("[GAME] Microphone permission denied:", err);
         dispatch({ type: "SET_STATUS", status: "error" });

@@ -30,3 +30,32 @@ User-generated content pipeline where anyone can upload a story and the system h
 Script exists at `scripts/generate-sounds.ts` — reads cue-map.yaml, calls API, saves .mp3.
 Sound prompts documented in `public/sounds/SOUND-GENERATION-PROMPTS.md` (50 sounds across 3 stories).
 Currently manual — run script or generate individually. Future: integrate into pipeline above.
+
+## Scene Imagery During Gameplay
+Show visual representations of the current location/scene to the user during gameplay. Each story has card images already (`public/images/stories/{id}/card.webp`) — extend this with scene-specific images that change as the story progresses.
+
+**Approach:**
+- Pre-generated scene images per phase/beat (stored in `public/images/stories/{id}/scene-{n}.webp`)
+- Subtle fade transitions between scenes, don't break immersion
+- Images should be atmospheric/abstract (not literal) — eyes-closed game, images are for before/after
+- Future: auto-generate scene images from story description using image generation API
+
+## Auto-Generated Imagery in Story Pipeline
+When a user uploads a story, automatically determine what images are needed:
+- Analyze story beats, locations, mood progression
+- Generate appropriate scene/card images via image generation API
+- Match art style to story genre (horror = dark/muted, fantasy = vivid, etc.)
+- User can choose art style or let the system pick based on story vibe
+
+## Story Creation Modes
+Two modes for story creators:
+1. **Full Control** — "I want to write every single dialogue" — user writes all beats, choices, dialogue options
+2. **Creative Mode** — "Let it surprise you" — user provides premise, characters, genre, and the system generates the full story structure with beats, choices, and dialogue
+- Hybrid mode: user writes key moments, AI fills in transitions and ambient beats
+
+## Fun Story Creation Process
+Make the story upload/creation process itself feel like a game:
+- Interactive wizard that asks questions about the world, characters, tone
+- Preview snippets as you build (hear a sample narration of your opening)
+- Collaborative — AI suggests improvements, user accepts/rejects
+- Templates for common genres (horror therapy session, mystery lighthouse, etc.)
