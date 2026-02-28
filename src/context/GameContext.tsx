@@ -241,14 +241,6 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const startSession = useCallback(async () => {
     dispatch({ type: "SET_STATUS", status: "connecting" });
     try {
-      const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
-      if (!agentId) {
-        console.error("[GAME] NEXT_PUBLIC_ELEVENLABS_AGENT_ID not set");
-        dispatch({ type: "SET_STATUS", status: "error" });
-        return;
-      }
-      console.log(`[GAME] Starting session with agentId=${agentId}`);
-
       // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt
       try {
         await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -258,6 +250,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_STATUS", status: "error" });
         return;
       }
+
+      // Fetch signed URL from our backend (server-side API key auth)
+      // This bypasses the LiveKit WebRTC 404 issue by using WebSocket instead
+      console.log("[GAME] Fetching signed URL from backend...");
+      const signedUrlRes = await fetch("/api/signed-url");
+      if (!signedUrlRes.ok) {
+        console.error(`[GAME] Failed to get signed URL: status=${signedUrlRes.status}`);
+        dispatch({ type: "SET_STATUS", status: "error" });
+        return;
+      }
+      const { signedUrl } = await signedUrlRes.json();
+      console.log(`[GAME] Got signed URL: ${signedUrl?.slice(0, 80)}...`);
 
       const overrides = {
         agent: {
@@ -272,8 +276,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.log("[GAME] conversation.startSession overrides:", overrides);
 
       const cid = await conversation.startSession({
-        agentId,
-        connectionType: "webrtc",
+        signedUrl,
         overrides,
       });
       console.log(`[GAME] Session started, conversationId=${cid}`);
