@@ -323,8 +323,11 @@ async function performPostStreamUpdates(
       `[WEBHOOK] Beat advanced: ${beatAdvanced} — phase=${prevPhaseIndex}→${nextState.currentPhaseIndex}, beat=${prevBeatIndex}→${nextState.currentBeatIndex}`,
     );
 
-    // ── Check for ending ──────────────────────────────────────────
-    const endingId = evaluateEndingCondition(config, nextState);
+    // ── Check for ending (only in final phase — Phase 5, index 4) ──
+    // Ending conditions include a default fallback with empty trigger that always matches.
+    // Running this check in earlier phases would immediately end the game.
+    const isInFinalPhase = nextState.currentPhaseIndex >= config.arc.phases.length - 1;
+    const endingId = isInFinalPhase ? evaluateEndingCondition(config, nextState) : null;
     if (endingId) {
       console.log(`[WEBHOOK] Ending detected: endingId="${endingId}" — marking gameOver`);
       nextState = { ...nextState, endingId };
@@ -335,7 +338,7 @@ async function performPostStreamUpdates(
       });
       return;
     }
-    console.log(`[WEBHOOK] Ending detected: none`);
+    console.log(`[WEBHOOK] Ending check: ${isInFinalPhase ? "none (final phase, no conditions matched)" : `skipped (phase ${nextState.currentPhaseIndex}, not final)`}`);
 
     // ── Check for beat with choices — store for voice presentation next turn ──
     const nextBeat = getCurrentBeat(config, nextState);
