@@ -76,6 +76,17 @@ Two-level personalization:
    - Cache generated images for replay
    - Privacy: face data stays local or is processed ephemerally, never stored on server
 
+## Research: Health & Wellness Benefits of Immersive Voice Games
+Research and compile evidence that playing immersive voice-based games like InnerPlay has indirect health/wellness benefits:
+- **Therapeutic parallels** — guided imagery, narrative therapy, bibliotherapy are established techniques. Voice games use similar mechanisms (imagination, emotional engagement, safe space for expression)
+- **Stress reduction** — studies on immersive audio experiences, ASMR, guided meditation reducing cortisol
+- **Emotional processing** — role-playing and narrative engagement as tools for emotional regulation (similar to drama therapy)
+- **Mindfulness through flow state** — eyes-closed, voice-only interaction may induce flow states similar to meditation
+- **Cognitive benefits** — imagination exercises, active listening, decision-making under emotional pressure
+- **Loneliness / social connection** — parasocial interaction with AI characters as a bridge (not replacement) for people who struggle with human connection
+- Goal: build a "Science Behind InnerPlay" page or section that cites real research, not just marketing claims
+- Look for: peer-reviewed studies, meta-analyses, established therapeutic frameworks that validate what we're doing indirectly
+
 ## Pre-Recorded Gameplay Videos for Marketing
 Record actual gameplay sessions and publish as short-form content:
 - Instagram Reels / TikTok / YouTube Shorts — 30-60 second highlights
