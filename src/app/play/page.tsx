@@ -12,7 +12,7 @@ function PlayContent() {
   const storyId = searchParams.get("story") ?? "the-last-session";
 
   const [onboardingDone, setOnboardingDone] = useState(false);
-  const { status, startSession } = useGame();
+  const { status, startSession, errorMessage } = useGame();
 
   // ── Mount logging ────────────────────────────────────────────
   useEffect(() => {
@@ -89,6 +89,7 @@ function PlayContent() {
 
   if (status === "error") {
     console.log("[PLAY] Rendering: error screen");
+    const isQuotaError = errorMessage?.toLowerCase().includes("quota");
     return (
       <div
         style={{
@@ -103,8 +104,15 @@ function PlayContent() {
         }}
       >
         <p style={{ color: "var(--color-danger)" }}>
-          Connection lost. The session cannot continue.
+          {isQuotaError
+            ? "Voice service quota exceeded. Please upgrade your ElevenLabs plan to continue."
+            : "Connection lost. The session cannot continue."}
         </p>
+        {errorMessage && (
+          <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+            {errorMessage}
+          </p>
+        )}
         <a
           href="/"
           style={{

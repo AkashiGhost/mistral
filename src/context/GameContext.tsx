@@ -32,6 +32,8 @@ interface GameContextValue {
   isSpeaking: boolean;
   /** Whether the game is paused */
   isPaused: boolean;
+  /** Human-readable error message when status is "error" */
+  errorMessage: string | null;
   startSession: (storyId?: string, firstMessage?: string) => Promise<void>;
   endSession: () => Promise<void>;
   selectChoice: (beatId: string, optionId: string) => void;
@@ -51,6 +53,7 @@ type UIState = {
   pendingSoundCues: Array<{ soundId: string; position: number }>;
   hasElaraSpoken: boolean;
   isPaused: boolean;
+  errorMessage: string | null;
   conversationId: string | null;
 };
 
@@ -63,7 +66,8 @@ type UIAction =
   | { type: "ADD_SOUND_CUES"; cues: Array<{ soundId: string; position: number }> }
   | { type: "CLEAR_SOUND_CUES" }
   | { type: "GAME_OVER" }
-  | { type: "TOGGLE_PAUSE" };
+  | { type: "TOGGLE_PAUSE" }
+  | { type: "SET_ERROR"; message: string };
 
 function uiReducer(state: UIState, action: UIAction): UIState {
   // ── Reducer logging ────────────────────────────────────────────
@@ -103,6 +107,9 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       break;
     case "TOGGLE_PAUSE":
       console.log(`[GAME] Reducer: TOGGLE_PAUSE → ${!state.isPaused}`);
+      break;
+    case "SET_ERROR":
+      console.log(`[GAME] Reducer: SET_ERROR → "${action.message}"`);
       break;
     default:
       break;
@@ -144,6 +151,8 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       return { ...state, status: "ended", activeChoice: null };
     case "TOGGLE_PAUSE":
       return { ...state, isPaused: !state.isPaused };
+    case "SET_ERROR":
+      return { ...state, status: "error", errorMessage: action.message };
     default:
       return state;
   }
@@ -160,6 +169,7 @@ const initialUIState: UIState = {
   pendingSoundCues: [],
   hasElaraSpoken: false,
   isPaused: false,
+  errorMessage: null,
   conversationId: null,
 };
 
@@ -243,11 +253,17 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const stableOnDisconnect = useCallback(() => {
-    console.log("[GAME] Disconnected from ElevenLabs");
+  const stableOnDisconnect = useCallback((details?: { reason: string; message?: string; closeCode?: number; closeReason?: string }) => {
+    console.log("[GAME] Disconnected from ElevenLabs:", JSON.stringify(details ?? {}));
     stopPollingRef.current();
     clearSilenceTimerRef.current();
-    dispatch({ type: "SET_STATUS", status: "idle" });
+    if (details?.reason === "error") {
+      const msg = details.message ?? details.closeReason ?? "Connection error";
+      console.error(`[GAME] Disconnect reason: error — ${msg}`);
+      dispatch({ type: "SET_ERROR", message: msg });
+    } else {
+      dispatch({ type: "SET_STATUS", status: "idle" });
+    }
   }, []);
 
   const stableOnMessage = useCallback(({ message, source }: { message: string; source: string }) => {
@@ -263,7 +279,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   const stableOnError = useCallback((message: string) => {
     console.error("[GAME] ERROR:", message);
-    dispatch({ type: "SET_STATUS", status: "error" });
+    dispatch({ type: "SET_ERROR", message });
     stopPollingRef.current();
   }, []);
 
@@ -420,6 +436,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const value: GameContextValue = {
     ...state,
     isSpeaking: conversation.isSpeaking,
+    errorMessage: state.errorMessage,
     startSession,
     endSession,
     selectChoice,
