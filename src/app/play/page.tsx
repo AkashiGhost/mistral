@@ -1,12 +1,16 @@
 "use client";
 
 import { useState, useCallback, useEffect, useRef } from "react";
+import { useSearchParams } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
 import { GameSession } from "@/components/game/GameSession";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 function PlayContent() {
+  const searchParams = useSearchParams();
+  const storyId = searchParams.get("story") ?? "the-last-session";
+
   const [onboardingDone, setOnboardingDone] = useState(false);
   const { status, startSession } = useGame();
 
@@ -36,14 +40,14 @@ function PlayContent() {
     }
   }, [onboardingDone]);
 
-  const handleOnboardingComplete = useCallback(() => {
-    console.log("[PLAY] Onboarding complete — calling startSession()");
+  const handleOnboardingComplete = useCallback((firstMessage: string) => {
+    console.log(`[PLAY] Onboarding complete — calling startSession(storyId=${storyId}, firstMessage="${firstMessage.slice(0, 60)}…")`);
     setOnboardingDone(true);
-    void startSession();
-  }, [startSession]);
+    void startSession(storyId, firstMessage);
+  }, [startSession, storyId]);
 
   if (!onboardingDone) {
-    return <OnboardingFlow onComplete={handleOnboardingComplete} />;
+    return <OnboardingFlow storyId={storyId} onComplete={handleOnboardingComplete} />;
   }
 
   // Connecting to ElevenLabs
@@ -114,7 +118,7 @@ function PlayContent() {
     );
   }
 
-  return <GameSession />;
+  return <GameSession storyId={storyId} />;
 }
 
 export default function PlayPage() {

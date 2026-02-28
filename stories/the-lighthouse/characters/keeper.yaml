@@ -1,0 +1,239 @@
+##
+## THE KEEPER — Player Character Reference Card
+## Story: The Lighthouse
+## Schema: character-schema.json (draft-07)
+##
+## PIPELINE USAGE:
+##   This file is NOT injected into the LLM system prompt. It is a reference
+##   for the pipeline and the voice character (radio-voice.yaml) to understand
+##   the player's role, constraints, and the world they inhabit.
+##   The radio voice uses this to calibrate its impossible knowledge —
+##   everything listed here is something the voice might know and shouldn't.
+##
+## NOTE: The radio voice (radio-voice.yaml) is the narrator and sole NPC.
+##   This file describes the player's avatar — the keeper the voice speaks TO.
+##   The keeper never speaks as a scripted character. The player IS the keeper.
+##
+
+# ─────────────────────────────────────────────
+# TOP-LEVEL IDENTITY
+# ─────────────────────────────────────────────
+
+id: keeper
+name: "The Keeper"
+role: player_character
+# The keeper is the player's avatar. They do not have scripted dialogue —
+# the player speaks as the keeper. This card defines the keeper's world,
+# what they know, what they have, and what the voice can reference about them.
+
+story: the-lighthouse
+
+# ─────────────────────────────────────────────
+# IDENTITY LAYERS
+# ─────────────────────────────────────────────
+# The keeper has three layers of identity, but unlike the radio voice,
+# these are revealed TO the player about themselves, not by them.
+#   1. surface    — what the player assumes (lighthouse keeper, professional, alone)
+#   2. hidden     — what they have not examined (why they are here, how long, what they left)
+#   3. true       — variant-dependent: the keeper may not be what they think they are
+
+identity:
+  surface: >
+    A lighthouse keeper on a remote rocky island. Professional, competent, alone by
+    choice or by assignment — the distinction is unclear and possibly irrelevant.
+    They tend the light. They monitor the radio. They climb the 87 steps to the lamp
+    room when the machinery needs attention. They have been here long enough that the
+    lighthouse feels like an extension of their body — they know every draft, every
+    creak, every sound the building makes in different weather. They are alone and
+    have been alone. The storm tonight is bad but not unprecedented. The radio
+    crackling to life is the first human contact in weeks. Maybe months.
+
+  hidden: >
+    The keeper cannot clearly remember arriving at the lighthouse. They know they
+    came here — the red door, the 87 steps, the desk, the photograph — but the
+    when is fuzzy. Was it months ago? Years? The date on the logbook seems wrong
+    but they cannot say why. They had a life before this island. Someone they loved
+    (the photograph). A reason for leaving. But the details are like looking through
+    frosted glass: shapes without edges. The isolation has not driven them mad —
+    it has simply made the question of "before" feel irrelevant. The lighthouse
+    is what is real. The light is what matters. Everything else is weather.
+
+  true:
+    # The keeper's true nature is never fully revealed — it depends on the
+    # revelation variant. In the "the_sea" variant, the keeper IS the voice,
+    # talking to themselves. In "last_keeper," the keeper is the successor to
+    # a dead man and the lighthouse remembers them both. In "signal_entity,"
+    # the keeper is simply a person who answered a radio and attracted something
+    # vast. In "time_loop," the keeper is living in a different decade than
+    # they think and intercepted a ghost signal.
+    #
+    # The keeper's true nature is the player's to discover. This card does
+    # not resolve it — the radio voice does.
+
+    - >
+      last_keeper variant: The keeper is real, present, alive. They are the
+      current keeper of this lighthouse, inheritor of Thomas Hargrove's post.
+      They have been here for four years. The lighthouse chose them — or Hargrove
+      did, from whatever remains of him in the walls and the radio frequencies.
+      The keeper is haunted but not in danger. They are needed.
+
+    - >
+      signal_entity variant: The keeper is real, present, alive. They are a
+      normal person who answered a radio and made contact with something that
+      exists in the electromagnetic spectrum. They are not special except in
+      one way: they answered. Everyone else who heard the static turned the
+      dial. The keeper listened. That act of attention is what the entity values.
+
+    - >
+      time_loop variant: The keeper is real but temporally displaced. They
+      believe it is the current year. It may not be. The lighthouse exists
+      outside normal time — the storm that plays outside is the same storm
+      from 1987, replaying. The keeper walked into a loop when they arrived
+      at this lighthouse. They have been living the same night, answering
+      the same call, without knowing it resets.
+
+    - >
+      the_sea variant: The keeper may not be real. Or they are real and the
+      voice is not. Or both are real and neither is a person. The keeper has
+      been alone so long that the boundaries between self, environment, and
+      imagination have dissolved. The voice on the radio is the keeper's own
+      voice, reflected back through static and loneliness. The keeper is
+      talking to themselves. They have been talking to themselves for a very
+      long time.
+
+# ─────────────────────────────────────────────
+# THE KEEPER'S WORLD
+# ─────────────────────────────────────────────
+# Physical details of the lighthouse. These are the "impossible knowledge"
+# the radio voice uses — every detail here is something the voice knows
+# that it should not. The pipeline can reference this list to validate
+# the voice's knowledge claims against ground truth.
+
+world:
+  lighthouse:
+    door_color: red
+    steps_to_lamp_room: 87
+    west_wall_crack: "A hairline fracture where the draft comes through in winter. The keeper stuffed it with rags."
+    desk_location: "By the east window. Faces the sea."
+    photograph: "Framed, by the window. Someone the keeper loved. The voice never says who — the keeper fills in the face."
+    coffee_mug: "Chipped handle, left side. The keeper's thumb rests in the chip out of habit."
+    book_on_desk: "Half-read. The keeper has been on the same page for weeks."
+    lamp_room: "Top of the 87 steps. The machinery turns the beam. The machinery has a sound — grinding, rhythmic, the lighthouse's heartbeat."
+    foghorn: "Automated. Sounds every 90 seconds in poor visibility. Deep, resonant, felt in the chest."
+    radio: "Marine VHF. Channel 16 — international distress frequency. The keeper monitors it as duty."
+    north_wall: "Rebuilt after the 1987 storm. The new wall is concrete where the old one was stone. The keeper does not know this history."
+
+  island:
+    name: "Unnamed in the story. A rocky outcrop. No harbor, just a stone landing."
+    distance_to_mainland: "Unclear. Far enough that the keeper cannot see land."
+    wildlife: "Seabirds. Seals on the south rocks. Nothing else."
+    vegetation: "Salt grass. Nothing taller than a person's knee."
+
+  weather:
+    storm_at_session_start: "Violent. Wind 50+ knots. Visibility near zero. Waves breaking over the lower rocks."
+    storm_behavior: "Peaks at Phase 2-3, then DROPS unnaturally. Does not calm — drops. The distinction matters."
+    after_storm_drops: "The silence is enormous. The sea is still but not peaceful — held, like a breath."
+
+# ─────────────────────────────────────────────
+# VOICE RULES (Player Guidance)
+# ─────────────────────────────────────────────
+# The keeper is the PLAYER — they speak freely. These are not constraints
+# on the player but guidance for the pipeline's intent classifier.
+
+voice:
+  description: >
+    The player speaks as themselves in the role of keeper. No scripted dialogue.
+    The intent classifier reads their input for: emotional register (empathetic,
+    analytical, nurturing, confrontational), challenge level (low, medium, high),
+    and key phrases to echo back.
+
+  expected_vocabulary: >
+    Maritime if they adopt the role: bearing, heading, position, copy that, over.
+    The intent classifier should recognize both maritime terminology and plain
+    English — not all players will use nautical language, and that is fine.
+
+  silence_handling: >
+    If the keeper is silent for 10+ seconds, the voice fills: "Are you still there?"
+    If silent for 20+ seconds: "Please. Are you still there?"
+    If silent for 30+ seconds: pipeline may auto-advance the beat.
+
+# ─────────────────────────────────────────────
+# KNOWLEDGE (What the Keeper Knows)
+# ─────────────────────────────────────────────
+# What the player-as-keeper should reasonably know. The pipeline uses this
+# to validate player assertions and the intent classifier's context.
+
+knowledge:
+  known_facts:
+    - "They are a lighthouse keeper on a remote island."
+    - "The storm is bad. They are alone."
+    - "They monitor the radio on Channel 16 — maritime distress frequency."
+    - "They know the lighthouse intimately — every step, every draft, every sound."
+    - "They have a duty to respond to distress calls."
+    - "They cannot physically reach a ship — no boat, storm is too violent."
+    - "The coast guard should be reachable but the radio only seems to reach this one voice."
+
+  unknown_facts:
+    - "How long they have been at the lighthouse — they think they know but may be wrong."
+    - "Why they came here — they had a reason once. It is not clear anymore."
+    - "Who is in the photograph — the player fills in the face. The pipeline never names them."
+    - "The history of the 1987 storm and the north wall collapse."
+    - "Thomas Hargrove and his twenty-three years as keeper."
+    - "That the radio frequency may not be connecting to a real ship."
+
+# ─────────────────────────────────────────────
+# PERSONALITY TRAITS
+# ─────────────────────────────────────────────
+# The keeper's default disposition. The player may diverge — these traits
+# describe the keeper the voice EXPECTS, not the keeper the player must be.
+
+personality:
+  duty: >
+    The keeper responds to the distress call because it is their job. Not heroism —
+    duty. The automatic response of someone trained to answer when someone calls
+    for help. This is the foundation: the keeper answered because that is what
+    keepers do. The voice builds everything on that single act.
+
+  isolation_tolerance: >
+    High. The keeper chose this work or accepted it without complaint. They are
+    comfortable alone — or they were, before tonight. The voice is the first crack
+    in that comfort. Not because the keeper was lonely (they might deny that) but
+    because contact, once made, is hard to release. The keeper is going to find it
+    very difficult to hang up.
+
+  curiosity: >
+    The keeper notices things. The wrong details. The impossible knowledge. A
+    keeper tends a light and watches the sea — observation is their profession.
+    They may not be analytical in the academic sense, but they notice when
+    something is off. The 87 steps. The red door. The keeper's name. They will
+    not miss these. The question is what they do with what they notice.
+
+  compassion: >
+    Default high. A person who tends a light for ships at sea is, at baseline,
+    someone who cares whether strangers live or die. The voice exploits this —
+    not cruelly, but the voice's need for connection finds its natural counterpart
+    in the keeper's instinct to help. The keeper is predisposed to stay on the line.
+
+# ─────────────────────────────────────────────
+# MUTABLE RUNTIME STATE
+# ─────────────────────────────────────────────
+# These are INITIAL values only. StoryState in code manages live values.
+
+mutable_state:
+  emotional_state: "alert"
+  # Valid values: "alert" | "engaged" | "suspicious" | "unsettled" | "afraid" | "accepting"
+  # Tracks the keeper's emotional arc as inferred from player input.
+
+  trust_in_voice: 5
+  # 0–10. How much the keeper trusts the voice. Starts at 5 (default goodwill
+  # for a distress call). Modified by choices and dialogue.
+
+  awareness_level: 0
+  # 0–10. How much the keeper has consciously registered that something is wrong.
+  # 0 = normal distress call. 5 = something is off. 10 = full understanding.
+  # Incremented by impossible knowledge revelations and sound removals.
+
+  isolation_duration: "unknown"
+  # The keeper does not know how long they have been here. This field is
+  # narrative, not numeric. The pipeline may update it based on the voice's
+  # prompting: "unknown" → "weeks" → "months" → "years" → "always"

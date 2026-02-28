@@ -1,15 +1,27 @@
 // ─────────────────────────────────────────────
 // Config loader — wraps loadStory with default paths from env
+// Supports multiple stories via storyId parameter
 // ─────────────────────────────────────────────
 
 import path from "path";
 import { loadStory } from "./story-loader";
 import type { GameConfig } from "./types/game-config";
 
-export function getGameConfig(): GameConfig {
-  const storyDir =
-    process.env.STORIES_BASE_PATH ??
-    path.join(process.cwd(), "stories", "the-last-session");
+// Cache configs per story ID to avoid re-parsing YAML on every request
+const configCache = new Map<string, GameConfig>();
+
+/** Valid story IDs — must match directory names under stories/ */
+export const STORY_IDS = ["the-last-session", "the-lighthouse", "room-4b"] as const;
+export type StoryId = (typeof STORY_IDS)[number];
+
+export function getGameConfig(storyId?: StoryId): GameConfig {
+  const id = storyId ?? "the-last-session";
+
+  // Return cached config if available
+  const cached = configCache.get(id);
+  if (cached) return cached;
+
+  const storyDir = path.join(process.cwd(), "stories", id);
   const schemasDir = path.join(process.cwd(), "schemas");
 
   console.log(`[CONFIG] Loading story config from ${storyDir}`);
@@ -28,11 +40,12 @@ export function getGameConfig(): GameConfig {
   const phases = config.arc.phases.length;
   const beats = config.arc.phases.reduce((sum, p) => sum + (p.beats?.length ?? 0), 0);
   const endings = config.arc.endingConditions?.length ?? 0;
-  console.log(`[CONFIG] Loaded: ${phases} phases, ${beats} beats, ${endings} endings`);
+  console.log(`[CONFIG] Loaded "${id}": ${phases} phases, ${beats} beats, ${endings} endings`);
 
   if (warnings.length > 0) {
     console.warn(`[CONFIG] Warnings: ${warnings.join(", ")}`);
   }
 
+  configCache.set(id, config);
   return config;
 }

@@ -32,7 +32,7 @@ interface GameContextValue {
   isSpeaking: boolean;
   /** Whether the game is paused */
   isPaused: boolean;
-  startSession: () => Promise<void>;
+  startSession: (storyId?: string, firstMessage?: string) => Promise<void>;
   endSession: () => Promise<void>;
   selectChoice: (beatId: string, optionId: string) => void;
   clearSoundCues: () => void;
@@ -169,6 +169,10 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(uiReducer, initialUIState);
   const conversationIdRef = useRef<string | null>(null);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // How long to wait (ms) before auto-nudging the AI to continue narrating
+  const SILENCE_TIMEOUT_MS = 8000;
 
   // ── Stop polling helper ───────────────────────────────────────
   const stopPolling = useCallback(() => {
@@ -176,6 +180,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.log("[GAME] Stopping poll interval");
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
+    }
+  }, []);
+
+  // ── Clear silence timer helper ──────────────────────────────
+  const clearSilenceTimer = useCallback(() => {
+    if (silenceTimerRef.current !== null) {
+      clearTimeout(silenceTimerRef.current);
+      silenceTimerRef.current = null;
     }
   }, []);
 
@@ -226,6 +238,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     onDisconnect: () => {
       console.log("[GAME] Disconnected from ElevenLabs");
       stopPolling();
+      clearSilenceTimer();
       // SET_STATUS "idle" is ignored by reducer when status is already "ended"
       dispatch({ type: "SET_STATUS", status: "idle" });
     },
@@ -236,10 +249,24 @@ export function GameProvider({ children }: { children: ReactNode }) {
         // Immediate poll after each AI turn to pick up choices instantly
         void pollGameState();
       }
+      // User spoke — reset silence timer
+      if (source === "user") {
+        clearSilenceTimer();
+      }
     },
     onModeChange: ({ mode }: { mode: string }) => {
       console.log(`[GAME] Mode changed to: ${mode}`);
-      // mode is "speaking" or "listening" — we already track isSpeaking from the hook
+      // ── Auto-advance on silence ──────────────────────────────
+      // When AI finishes speaking ("listening" mode), start silence timer.
+      // If player doesn't speak within SILENCE_TIMEOUT_MS, nudge the AI
+      // to continue narrating by sending a silent user message.
+      clearSilenceTimer();
+      if (mode === "listening") {
+        silenceTimerRef.current = setTimeout(() => {
+          console.log("[GAME] Silence timeout — auto-advancing narration");
+          conversation.sendUserMessage("[silence]");
+        }, SILENCE_TIMEOUT_MS);
+      }
     },
     onError: (message: string) => {
       console.error("[GAME] ERROR:", message);
@@ -249,8 +276,11 @@ export function GameProvider({ children }: { children: ReactNode }) {
   });
 
   // ── Start session ─────────────────────────────────────────────
-  const startSession = useCallback(async () => {
+  const startSession = useCallback(async (storyId?: string, firstMessage?: string) => {
     dispatch({ type: "SET_STATUS", status: "connecting" });
+    const resolvedStoryId = storyId ?? "the-last-session";
+    const resolvedFirstMessage = firstMessage ?? "... Hello, Doctor. Thank you for seeing me tonight.";
+
     try {
       const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
       if (!agentId) {
@@ -258,7 +288,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_STATUS", status: "error" });
         return;
       }
-      console.log(`[GAME] Starting session with agentId=${agentId}`);
+      console.log(`[GAME] Starting session: agentId=${agentId}, storyId=${resolvedStoryId}`);
 
       // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt
       try {
@@ -271,17 +301,21 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
 
       // Overrides enabled on dashboard Security tab.
-      // firstMessage: leading "..." gives WebRTC audio time to initialize before first real word.
+      // Leading "... " gives WebRTC audio time to initialize before first real word.
       // System prompt NOT overridden — webhook handles it server-side.
-      console.log("[GAME] Starting session with firstMessage override for audio init padding");
+      // story_id passed via elevenlabs_extra_body so the webhook knows which story config to load.
+      console.log(`[GAME] firstMessage: "${resolvedFirstMessage.slice(0, 60)}…"`);
 
       const cid = await conversation.startSession({
         agentId,
         connectionType: "webrtc",
         overrides: {
           agent: {
-            firstMessage: "... Hello, Doctor. Thank you for seeing me tonight.",
+            firstMessage: `... ${resolvedFirstMessage}`,
           },
+        },
+        customLlmExtraBody: {
+          story_id: resolvedStoryId,
         },
       });
       console.log(`[GAME] Session started, conversationId=${cid}`);
@@ -292,7 +326,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       await fetch("/api/game-state", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: cid }),
+        body: JSON.stringify({ conversationId: cid, storyId: resolvedStoryId }),
       });
       console.log("[GAME] Game state initialized");
     } catch (err) {
@@ -351,8 +385,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     return () => {
       stopPolling();
+      clearSilenceTimer();
     };
-  }, [stopPolling]);
+  }, [stopPolling, clearSilenceTimer]);
 
   const value: GameContextValue = {
     ...state,

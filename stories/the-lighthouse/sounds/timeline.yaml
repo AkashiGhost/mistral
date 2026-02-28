@@ -1,0 +1,472 @@
+# =============================================================================
+# timeline.yaml — The Lighthouse
+# Deterministic timed sound schedule — fires at specific elapsed game times
+# regardless of player choices.
+#
+# HOW IT WORKS:
+#   The pipeline runs a parallel timer track starting at game init (0:00).
+#   Each event fires when the elapsed clock matches the `time` field.
+#   Conditional events additionally check game_state before executing.
+#   This track is completely independent of player input — these ALWAYS fire.
+#
+# RELATIONSHIP TO cue-map.yaml:
+#   sound_id values reference keys in cue-map.yaml ambient, intermittent,
+#   reactive, atmospheric, transitions, and endings sections.
+#
+# DESIGN PRINCIPLE:
+#   The timeline is the spine of the horror. The player's choices shape
+#   the narrative; the timeline shapes the atmosphere. Both run simultaneously.
+#   Player can fight the story. They cannot fight the silence.
+#
+# SOUND DESIGN ARC:
+#   Phase 1 (0:00-2:00): Full storm. Everything active. Hostile but comprehensible.
+#   Phase 2 (2:00-4:00): Storm intensifying. Waves closer. Wind louder. Urgency.
+#   Phase 3 (4:00-6:00): Subtractive horror. Machinery STOPS. Foghorn dies.
+#                         Storm DROPS unnaturally. Radio thins. Silence grows.
+#   Phase 4 (6:00-8:00): 2 seconds absolute silence. Deep ocean drone. Sub-bass.
+#   Phase 5 (8:00-10:00): Ending-variant sounds.
+#
+# REMOVAL SEQUENCE (from arc.yaml Phase 3):
+#   5:00 -> machinery HARD STOP (lighthouse heartbeat stops)
+#   5:30 -> foghorn stops (lighthouse stops being a navigation aid)
+#   5:45 -> storm DROPS (wind and waves pull back unnaturally)
+#   6:00 -> mute ALL (absolute silence before revelation)
+#
+# TIME FORMAT: MM:SS (elapsed game time from session start)
+# =============================================================================
+
+timeline:
+
+  # ---------------------------------------------------------------------------
+  # PHASE 1: CONTACT — 0:00 to 2:00
+  # Full storm. All sounds present. The lighthouse is functional. The storm is
+  # hostile but comprehensible. A lighthouse. A storm. A radio. These things
+  # make sense. The sense-making is what Phase 3 will take apart.
+  # Arc.yaml Phase 1 sound_state.active:
+  #   [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery, foghorn]
+  # ---------------------------------------------------------------------------
+
+  - time: "0:00"
+    action: start_ambient
+    sound_ids: [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery]
+    fade_in_seconds: 0
+    description: >
+      Session begins. Storm wind, crashing waves, radio static, and lighthouse
+      machinery start immediately at their baseline volumes. The player is in a
+      lighthouse during a violent storm. The environment is hostile but functional
+      — the lighthouse works, the radio works, the keeper has a job. These four
+      sounds are the definition of "normal" for this experience. Everything that
+      happens next is their removal.
+
+  - time: "0:10"
+    action: start_intermittent
+    sound_ids: [foghorn, metal_creaking, thunder_distant]
+    description: >
+      Foghorn, structural creaking, and distant thunder begin with a 10-second
+      delay. The slight delay makes them feel organic — already happening, the
+      player just noticing. Foghorn fires every ~90s +/-10s. Metal creaking
+      every ~40s +/-15s. Thunder every ~60s +/-30s. Irregular timing prevents
+      them from feeling scripted. These are the sounds of a working lighthouse
+      in a working storm.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 2: GUIDANCE — 2:00 to 4:00
+  # Storm intensifying. Waves get louder (closer). Wind picks up.
+  # The ship is getting closer (if there is a ship). The urgency of the
+  # distress call is reinforced by the worsening conditions.
+  # No sounds are removed yet — this is still a comprehensible storm.
+  # But the pressure is building.
+  #
+  # Arc.yaml Phase 2 sound_state volume_adjustments:
+  #   storm_wind: 0.7, waves_crash: 0.65
+  # ---------------------------------------------------------------------------
+
+  - time: "2:00"
+    action: volume_adjust
+    sound_id: waves_crash
+    target_volume: 0.65
+    fade_duration_seconds: 8
+    description: >
+      Waves get louder and closer over 8 seconds. The sea is rising. The ship
+      is approaching (if there is a ship). The bass impact of each wave becomes
+      more present. This is not panic-inducing — it is the natural intensification
+      of a storm. But the player's body registers the increase in low-frequency
+      energy. Matches arc.yaml Phase 2 sound_state volume_adjustments.
+
+  - time: "2:30"
+    action: volume_adjust
+    sound_id: storm_wind
+    target_volume: 0.7
+    fade_duration_seconds: 10
+    description: >
+      Wind intensifies gradually over 10 seconds. The gusts become more frequent,
+      the howl more sustained. The lighthouse creaks — the player can feel the
+      building strain against the weather. This reaches peak storm at approximately
+      3:00-4:00. Matches arc.yaml Phase 2 sound_state volume_adjustments.
+
+  - time: "3:30"
+    action: stop_intermittent
+    sound_id: thunder_distant
+    description: >
+      Distant thunder stops appearing. Not dramatic — it simply does not fire
+      again. The storm is changing character. The player will not consciously
+      notice the absence, but it removes one more layer of "normal weather"
+      from the soundscape. The storm is becoming less like weather and more
+      like something else.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 3: WRONGNESS — 4:00 to 6:00
+  # The storm peaks and then DROPS. The key horror design principle:
+  # the storm going quiet is infinitely worse than the storm getting loud.
+  # Loud is nature. Quiet is wrong.
+  #
+  # REMOVAL SEQUENCE:
+  #   4:30 -> radio static gets slightly louder (becomes more noticeable)
+  #   5:00 -> machinery HARD STOP (the lighthouse's heartbeat stops)
+  #   5:30 -> foghorn stops (the lighthouse stops being a navigation aid)
+  #   5:45 -> storm DROPS (wind and waves pull back — the sea holds its breath)
+  #   5:50 -> radio static begins to thin (voice is clearing)
+  #
+  # Arc.yaml Phase 3 sound_state:
+  #   active: [storm_wind, waves_crash, radio_static_ambient]
+  #   removed: [lighthouse_machinery, foghorn]
+  #   volume_adjustments: storm_wind: 0.3, waves_crash: 0.4
+  # ---------------------------------------------------------------------------
+
+  - time: "4:30"
+    action: volume_adjust
+    sound_id: radio_static_ambient
+    target_volume: 0.25
+    fade_duration_seconds: 10
+    description: >
+      Radio static becomes slightly louder — not dramatically, but enough that
+      the player starts to notice it as a distinct presence rather than background
+      texture. As other sounds begin to disappear, the static fills the gaps.
+      Preparation: by Phase 4, the static will be gone and its absence deafening.
+
+  - time: "5:00"
+    action: hard_stop
+    sound_id: lighthouse_machinery
+    fade_duration_seconds: 0
+    description: >
+      KEY MOMENT. The lighthouse machinery stops. INSTANTLY. No winding down.
+      No gradual slowing. The gears were turning. Now they are not.
+      Implemented as immediate gain.value = 0 (NOT a ramp). A brief shudder
+      SFX (machinery_stop from cue-map) plays simultaneously to mark the seize.
+      The silence where the grinding was is physical — like a pressure change.
+      The beam may still turn on momentum, but the sound is gone.
+      The keeper's functional identity — lighthouse keeper — has just been
+      compromised. They are now just a person in a building.
+    implementation_note: >
+      If the audio engine requires a non-zero fade, use 0.001 seconds
+      (one millisecond). NEVER use 0.1s or longer. Play machinery_stop
+      SFX from cue-map simultaneously with the hard stop.
+
+  - time: "5:30"
+    action: stop_intermittent
+    sound_id: foghorn
+    description: >
+      The foghorn does not sound again. This is not a gain event — the
+      intermittent scheduler stops triggering it. The player will wait for the
+      next blast. 40 seconds pass. 60 seconds. It never comes. The waiting is
+      the horror. The lighthouse has stopped being a navigation aid. It is now
+      just a tower with a light. The silence where the foghorn should be is a
+      hole in the soundscape that the player's brain keeps trying to fill.
+
+  - time: "5:45"
+    action: gain_automation
+    sound_ids: [storm_wind, waves_crash]
+    target_volumes:
+      storm_wind: 0.15
+      waves_crash: 0.2
+    fade_duration_seconds: 3
+    description: >
+      THE STORM DROPS. Not fades — drops. Over 3 seconds, wind goes from 0.7
+      to 0.15 and waves from 0.65 to 0.2. Three seconds is fast enough to feel
+      WRONG. A storm does not stop like this. A storm does not hold its breath.
+      But this one does.
+      After the drop: the silence is enormous. The radio static is suddenly the
+      loudest thing in the room. The voice and the keeper are alone in a way that
+      feels structurally different from Phase 1 isolation. Phase 1: "alone in a
+      storm." Phase 3: "alone in silence, and the silence is listening."
+
+  - time: "5:50"
+    action: volume_adjust
+    sound_id: radio_static_ambient
+    target_volume: 0.15
+    fade_duration_seconds: 10
+    description: >
+      Radio static begins to thin. Over 10 seconds, it drops from 0.25 to 0.15.
+      The character of the static changes: less electrical, more organic, almost
+      like breathing. The voice is becoming clearer. The radio is becoming
+      irrelevant as a medium. This is the last stage before the static disappears
+      entirely in the Phase 4 mute at 6:00.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 4: REVELATION — 6:00 to 8:00
+  # 2 seconds of absolute silence — no wind, no waves, no static, nothing.
+  # Then the deep ocean drone enters. The voice speaks without static for the
+  # first time. "There is no ship." The revelation unfolds in near-silence.
+  # The drone and sub-bass are the only sounds.
+  #
+  # Arc.yaml Phase 4 sound_state:
+  #   active: [], removed: [storm_wind, waves_crash, radio_static_ambient]
+  #   added: [deep_ocean_drone]
+  # ---------------------------------------------------------------------------
+
+  - time: "6:00"
+    action: mute_all
+    fade_duration_seconds: 0.5
+    description: >
+      ALL sounds mute simultaneously over 0.5 seconds. Storm wind (at 0.15),
+      waves (at 0.2), radio static (at 0.15), metal creaking — everything goes
+      silent. The 0.5s prevents an audio click/pop from the gain discontinuity
+      while feeling sudden enough to shock.
+      The 2 seconds that follow (6:00 to 6:02) are absolute silence.
+      No wind. No waves. No static. No machinery. No foghorn. Nothing.
+      This is the loudest silence in the game because the player has been
+      conditioned to expect storm sounds as a constant since second 0.
+      Two seconds of nothing before the revelation.
+
+  - time: "6:02"
+    action: fade_in
+    sound_ids: [deep_ocean_drone, sub_bass]
+    fade_in_seconds: 4
+    description: >
+      The deep ocean drone emerges from the silence. 40-60Hz vast resonant tone
+      — the sound of the deep ocean itself. Sub-bass enters simultaneously, felt
+      more than heard. The 4-second fade is long enough to feel like something
+      rising from enormous depth rather than appearing.
+      These are the only sounds that will accompany the revelation. No storm.
+      No static. Just the ocean, vast and patient.
+      The voice speaks over this: "There is no ship."
+
+  # ---------------------------------------------------------------------------
+  # PHASE 5: RESOLUTION — 8:00 to 10:00
+  # Ending-specific sounds. Only ONE of these conditional branches executes
+  # per playthrough — the one matching game_state.ending_id.
+  #
+  # FOUR ENDINGS (from arc.yaml ending_conditions):
+  #   acceptance   — Storm resolves warm. Gentle waves. Voice remains.
+  #   loop         — Cold storm returns. Radio restarts. Same call.
+  #   release      — Static fades. Morning comes. Peace.
+  #   dissolution  — Everything returns. Then everything fades. Vast nothing.
+  #
+  # All endings fade out the deep_ocean_drone and sub_bass first
+  # (they belong to Phase 4, not Phase 5).
+  # ---------------------------------------------------------------------------
+
+  - time: "8:00"
+    action: fade_out
+    sound_id: deep_ocean_drone
+    fade_duration_seconds: 4
+    condition: null  # Always fires — Phase 4 drone ends regardless of ending
+    description: >
+      Phase 4 deep ocean drone fades out over 4 seconds as the resolution begins.
+      This clears the sonic space for the ending-specific sounds.
+      Fires unconditionally — all four endings share this transition.
+
+  - time: "8:00"
+    action: fade_out
+    sound_id: sub_bass
+    fade_duration_seconds: 4
+    condition: null  # Always fires alongside drone fadeout
+    description: >
+      Sub-bass fades out with the drone. The physical unease resolves — the
+      body relaxes slightly. What follows depends on the ending.
+
+  # --- ACCEPTANCE ENDING ---
+  # Keeper chose to stay connected. The storm resolves to warmth.
+  # The voice remains. The light stays on. Not alone anymore.
+  # Arc.yaml ending_conditions.acceptance.sound_signature: [storm_warm, waves_gentle]
+
+  - time: "8:00"
+    action: fade_in
+    sound_ids: [storm_warm, waves_gentle]
+    fade_in_seconds: 6
+    condition: "game_state.ending_id == 'acceptance'"
+    description: >
+      Acceptance ending: storm resolves to warm rain and gentle waves over
+      6 seconds. The EQ is warm — midrange prominent, highs rolled off. The
+      storm sounds like shelter now. The keeper chose to stay, and the world
+      responded. The voice is still on the radio. It will always be on the
+      radio. That is not a threat. That is company.
+
+  # --- LOOP ENDING ---
+  # Keeper hung up. The call restarts. The storm returns cold.
+  # Arc.yaml ending_conditions.loop.sound_signature: [radio_loop, storm_cold]
+
+  - time: "8:00"
+    action: fade_in
+    sound_ids: [storm_cold]
+    fade_in_seconds: 0  # INSTANT — the storm was never gone
+    condition: "game_state.ending_id == 'loop'"
+    description: >
+      Loop ending: cold storm returns INSTANTLY. Zero fade. The storm was
+      never gone — it was paused. Wind is sharp, high-pitched, percussive.
+      The world is indifferent. It always was.
+
+  - time: "8:00"
+    action: start_ambient
+    sound_ids: [radio_static_ambient]
+    fade_in_seconds: 0
+    condition: "game_state.ending_id == 'loop'"
+    description: >
+      Loop ending: radio static returns instantly alongside the cold storm.
+      The radio is live again. The frequency is open. Someone is about to call.
+
+  - time: "8:30"
+    action: play_once
+    sound_ids: [radio_loop]
+    condition: "game_state.ending_id == 'loop'"
+    description: >
+      Loop ending: the first transmission replays. Same static. Same burst.
+      Same words. Same panic. "Can anyone hear me?" The voice sounds exactly
+      as it did at 0:00. Same urgency. Same hope. Same fear.
+      30 seconds after the storm returns — enough time for the keeper to
+      register that the loop has restarted, then hear the confirmation.
+      The call is beginning again. The keeper will answer again.
+      Again. Again. Again.
+
+  # --- RELEASE ENDING ---
+  # Keeper released the voice. Static fades. Morning comes.
+  # Arc.yaml ending_conditions.release.sound_signature: [morning_calm, waves_gentle]
+
+  - time: "8:00"
+    action: fade_in
+    sound_ids: [waves_gentle]
+    fade_in_seconds: 8
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: gentle waves fade in slowly over 8 seconds. The violence
+      is gone. The sea is breathing. Not threatening — just present. The ocean
+      that held the voice (or the ship, or the signal, or nothing) is calm now.
+
+  - time: "8:15"
+    action: volume_adjust
+    sound_id: radio_static_ambient
+    target_volume: 0.1
+    fade_duration_seconds: 0
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: radio static returns at very low volume — just enough
+      to be present. It is going to fade out. The static is the voice's last
+      thread of presence. A whisper before goodbye.
+
+  - time: "8:30"
+    action: fade_out
+    sound_id: radio_static_ambient
+    fade_duration_seconds: 15
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: radio static fades out very slowly over 15 seconds.
+      Like a tide going out. The voice is leaving. Not dramatically — gently.
+      The keeper told it it was OK to stop. It is stopping. The slow fade is
+      the goodbye: not a click, not a slam, just a gradual thinning until
+      there is nothing left but the waves.
+
+  - time: "9:00"
+    action: fade_in
+    sound_ids: [morning_calm]
+    fade_in_seconds: 8
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: morning calm fades in. Gentle waves on rock. A single
+      seabird. Clear air. The storm is over. The night is over. The call is
+      over. The morning does not know what happened in this lighthouse.
+      It is simply morning. That is enough.
+
+  # --- DISSOLUTION ENDING ---
+  # Keeper questioned reality. Everything returns. Then everything fades.
+  # Arc.yaml ending_conditions.dissolution.sound_signature: [deep_ocean_drone, sub_bass]
+
+  - time: "8:00"
+    action: restore_all_channels
+    sound_ids: [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery, foghorn]
+    restore_volumes:
+      storm_wind: 0.55
+      waves_crash: 0.5
+      radio_static_ambient: 0.2
+      lighthouse_machinery: 0.2
+      foghorn: 0.35
+    fade_in_seconds: 2
+    condition: "game_state.ending_id == 'dissolution'"
+    description: >
+      Dissolution ending: ALL original sounds return simultaneously over
+      2 seconds. Storm, waves, radio static, lighthouse machinery, foghorn —
+      everything that was removed during Phases 2-4 comes back at once, at
+      original volumes. After 6+ minutes of progressive silence and revelation,
+      this is overwhelming. Not violent — just full. The lighthouse is
+      completely alive again. The storm is back. The machinery is running.
+      The foghorn sounds. The radio crackles.
+      The horror: it was always like this. The silence was real. The restoration
+      is real. Neither proves anything except that neither state was ever stable.
+      The keeper cannot trust the quiet OR the noise.
+
+  - time: "9:00"
+    action: fade_all_to_nothing
+    fade_duration_seconds: 15
+    condition: "game_state.ending_id == 'dissolution'"
+    description: >
+      Dissolution ending: everything fades to absolute nothing over 15 seconds.
+      All channels — storm, waves, machinery, foghorn, radio static — ramp to
+      zero gain simultaneously. 15 seconds is long enough to notice. Long enough
+      to wait. Long enough to wonder when it will end. Then it ends.
+      Total silence. Not the 2-second revelation silence — a longer, vaster
+      silence. The silence of a lighthouse that may or may not exist, on an
+      island that may or may not be real, kept by a person who cannot remember
+      arriving. The light turns. That is all.
+
+  # ---------------------------------------------------------------------------
+  # MIXING AND CROSSFADE PARAMETERS
+  # Runtime audio graph parameters that apply continuously throughout the game.
+  # ---------------------------------------------------------------------------
+
+mixing:
+  tts_ducking:
+    # When the voice speaks via TTS, ambient volume reduces so narration is
+    # intelligible. -7dB is slightly more aggressive than The Last Session
+    # because storm sounds have more transient energy that masks speech.
+    ambient_reduction_db: -7
+    fade_in_duration_ms: 250    # Ambient ducks down when TTS starts
+    fade_out_duration_ms: 550   # Ambient returns more slowly after TTS ends
+    phase_4_override:
+      ambient_reduction_db: -4  # Gentler in Phase 4-5 — keep ocean drone palpable
+    implementation: >
+      On TTS start event: call fadeVolume(ambientGain, currentVolume * 0.45, 0.25)
+      On TTS end event: call fadeVolume(ambientGain, targetVolume, 0.55)
+      Using linearRampToValueAtTime as per sound-design-pipeline-research.md.
+      In Phase 4-5, use currentVolume * 0.63 (approximately -4dB) instead.
+
+  crossfade_default_ms: 2000
+  # Default for any transition not explicitly specified with a fade duration.
+  # 2000ms (2 seconds) is imperceptible as a crossfade but prevents
+  # audio discontinuities.
+
+  spatial:
+    # Panning values: -1.0 (full left) to +1.0 (full right)
+    # The lighthouse is spatially grounded: sea to the left, radio to the right.
+    # This gives the stereo field a consistent geography throughout.
+    storm_wind:
+      pan: 0.0
+      notes: "Omnidirectional. The storm surrounds the lighthouse."
+    waves_crash:
+      pan: -0.2
+      notes: "Slightly left. The sea-facing side of the lighthouse."
+    radio_static_ambient:
+      pan: 0.1
+      notes: "Slightly right. The radio is on the desk."
+    lighthouse_machinery:
+      pan: 0.0
+      vertical: 0.7
+      notes: "Above. The lamp room at the top of the 87 steps. Use 3D PannerNode."
+    foghorn:
+      pan: 0.0
+      vertical: 0.5
+      notes: "Above and out. Mounted high on the lighthouse exterior."
+    deep_ocean_drone:
+      pan: 0.0
+      notes: "Sourceless. The ocean has no source — it is everywhere."
+    sub_bass:
+      pan: 0.0
+      notes: "Omnidirectional by physics at 20-30Hz."

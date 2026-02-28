@@ -1,0 +1,34 @@
+id: room-4b
+title: "Room 4B"
+genre: horror-thriller
+subgenre: institutional-surreal
+tone:
+  - clinical
+  - oppressive
+  - surreal
+setting_summary: "Decommissioned St. Maren's Hospital at night. You are a security guard on the midnight shift. Room 4B on the 4th floor won't stay locked."
+duration_target_minutes: 10
+word_budget: 1500
+choice_points: 3
+ending_variants: 4
+revelation_variants: 4
+characters_count: 0  # No NPC — narrator only
+player_role: security_guard
+narrator: narrator  # Second person narrator, not a character
+voice_model: narrator  # Narrator describes what player sees/does
+atmosphere: true  # Dark + faint ambient atmosphere CSS layer
+content_rating: mature
+tags:
+  - horror
+  - hospital
+  - institutional
+  - surreal
+  - voice-only
+  - narrator
+  - eyes-closed
+tropes_as_foundation:
+  - "The Shining: institutional building that watches you"
+  - "House of Leaves: geometry that shouldn't exist"
+  - "Session 9: hospital that remembers its patients"
+  - "Jacob's Ladder: are you the guard or the patient?"
+  - "1408: the room that won't let you leave"

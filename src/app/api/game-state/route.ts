@@ -13,17 +13,10 @@ import {
   clearSoundCues,
   updateSession,
 } from "@/lib/session-store";
-import { getGameConfig } from "@/lib/config-loader";
+import { getGameConfig, type StoryId } from "@/lib/config-loader";
 import { initState } from "@/lib/state-machine";
-import type { GameConfig } from "@/lib/types/game-config";
 
 export const runtime = "nodejs";
-
-let storyConfig: GameConfig | null = null;
-function getConfig(): GameConfig {
-  if (!storyConfig) storyConfig = getGameConfig();
-  return storyConfig;
-}
 
 // GET /api/game-state?cid=<conversationId>
 export async function GET(req: NextRequest) {
@@ -74,28 +67,29 @@ export async function GET(req: NextRequest) {
 
 // POST /api/game-state — initialise or reset a session
 export async function POST(req: NextRequest) {
-  let body: { conversationId?: string };
+  let body: { conversationId?: string; storyId?: StoryId };
   try {
-    body = (await req.json()) as { conversationId?: string };
+    body = (await req.json()) as { conversationId?: string; storyId?: StoryId };
   } catch (err) {
     console.error("[GAME-STATE] POST failed to parse request body:", err);
     return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
   }
 
-  const { conversationId } = body;
+  const { conversationId, storyId } = body;
   if (!conversationId) {
     console.error("[GAME-STATE] POST missing conversationId");
     return NextResponse.json({ error: "Missing conversationId" }, { status: 400 });
   }
 
-  console.log(`[GAME-STATE] POST init for cid=${conversationId}`);
+  const resolvedStoryId = storyId ?? "the-last-session";
+  console.log(`[GAME-STATE] POST init for cid=${conversationId}, storyId=${resolvedStoryId}`);
 
-  const config = getConfig();
+  const config = getGameConfig(resolvedStoryId);
   const existingSession = getSession(conversationId);
 
   if (!existingSession) {
     const initialState = initState(config);
-    createSession(conversationId, initialState);
+    createSession(conversationId, initialState, resolvedStoryId);
     console.log(`[GAME-STATE] POST created new session for cid=${conversationId}`);
   } else {
     // Re-init (e.g., after ElevenLabs reconnect)

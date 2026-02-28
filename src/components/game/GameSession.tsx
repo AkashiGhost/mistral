@@ -3,15 +3,34 @@
 import { useEffect, useRef } from "react";
 import { useGame } from "@/context/GameContext";
 import { useSoundEngine } from "@/hooks/useSoundEngine";
+import { AtmosphereLayer } from "./AtmosphereLayer";
 
 // ─────────────────────────────────────────────
 // Game Session — Mistral / ElevenLabs version
 // ElevenLabs handles mic + TTS entirely.
 // We show: Elara's text, speaking/listening state, choice overlay.
+// AtmosphereLayer renders for stories with visual atmosphere (Room 4B).
+// Breathing dot adapts animation speed to current story phase.
 // ─────────────────────────────────────────────
 
-export function GameSession() {
+interface GameSessionProps {
+  storyId: string;
+}
+
+// Phase → breathing CSS class mapping
+function getBreathingClass(phase: number): string {
+  if (phase >= 4) return "breathe-phase4";
+  if (phase >= 3) return "breathe-phase3";
+  if (phase >= 2) return "breathe-phase2";
+  return "breathe";
+}
+
+// Stories that show the AtmosphereLayer (fog/vignette)
+const ATMOSPHERE_STORIES = new Set(["room-4b"]);
+
+export function GameSession({ storyId }: GameSessionProps) {
   const {
+    phase,
     status,
     lastElaraText,
     isSpeaking,
@@ -23,6 +42,8 @@ export function GameSession() {
     pendingSoundCues,
     clearSoundCues,
   } = useGame();
+
+  const showAtmosphere = ATMOSPHERE_STORIES.has(storyId);
 
   // ── Sound Engine — ambient sounds, timeline, TTS ducking ──
   useSoundEngine({
@@ -153,12 +174,16 @@ export function GameSession() {
   return (
     <div
       style={{
+        position: "relative",
         display: "flex",
         flexDirection: "column",
         minHeight: "100dvh",
         backgroundColor: "var(--color-bg)",
       }}
     >
+      {/* Atmosphere layer — fog/vignette for stories that use it */}
+      {showAtmosphere && <AtmosphereLayer phase={phase} />}
+
       {/* Main area — nearly blank during gameplay */}
       <div
         style={{
@@ -167,6 +192,8 @@ export function GameSession() {
           alignItems: "center",
           justifyContent: "center",
           padding: "var(--space-8)",
+          position: "relative",
+          zIndex: 1,
         }}
       >
         <div
@@ -177,9 +204,9 @@ export function GameSession() {
             gap: "var(--space-3)",
           }}
         >
-          {/* Breathing / speaking indicator */}
+          {/* Breathing / speaking indicator — phase-aware animation */}
           <div
-            className={isSpeaking ? "pulse" : "breathe"}
+            className={isSpeaking ? "pulse" : getBreathingClass(phase)}
             style={{
               width: 12,
               height: 12,

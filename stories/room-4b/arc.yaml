@@ -1,0 +1,1090 @@
+##
+## ARC DEFINITION — "Room 4B"
+## File: stories/room-4b/arc.yaml
+## Schema: schemas/arc-schema.json (draft-07)
+##
+## WHAT THIS FILE IS:
+##   The structural backbone of the story. The pipeline executes this as a state machine,
+##   advancing through 5 phases in order, firing beats sequentially, pausing at choice
+##   beats for player input, and resolving the ending when the final phase completes.
+##
+## HOW IT RELATES TO OTHER FILES:
+##   - prompts/system.yaml: owns the narrator voice rules and base system instruction
+##   - prompts/phase-overrides.yaml: owns per-phase behavioral directives
+##   - arc.yaml (this file): owns the structural sequence — what happens when and why
+##   - sounds/cue-map.yaml: owns the sound asset registry
+##   - sounds/timeline.yaml: owns the deterministic timed sound schedule
+##
+## KEY DIFFERENCE FROM "THE LAST SESSION":
+##   No NPC. No character card. The narrator is omniscient second person.
+##   The player explores a physical space, not a conversation.
+##   Choices are spatial (where to go, what to touch, what to read) not interpersonal.
+##   The revelation is what is IN the room, not who someone IS.
+##
+## TIMING MODEL:
+##   All time_ranges are targets, not hard locks. Word budgets enforce pacing.
+##   At 150 WPM average, total word budget 1500 words = ~10 minutes of narration.
+##   Player speaking time adds ~1-2 minutes. Total session: 8-12 minutes.
+##
+## PLAYER STYLE SCORING:
+##   The pipeline accumulates player_style_scores across all 3 choice beats.
+##   At Phase 4 entry, the dominant score selects the revelation variant.
+##   Maximum possible score per style: 7 points (across all 3 choices combined).
+##   Tie-breaking order: empathetic > nurturing > analytical > confrontational.
+##
+
+story_id: room-4b
+
+central_conflict: >
+  A security guard in a decommissioned hospital discovers a patient chart
+  with their name on it — and the building will not let them leave until
+  they find out what Room 4B contains
+
+theme: >
+  The fear of being the thing you are guarding against, the terror of institutional
+  systems that know you better than you know yourself, the impossibility of
+  distinguishing the watcher from the watched
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASES
+# ─────────────────────────────────────────────────────────────────────────────
+# 5 phases. Sequential. Each phase owns its sound environment and beat sequence.
+# The pipeline transitions on beat completion, not timers.
+# Timers are targets — word budgets are the enforcement mechanism.
+#
+# SPATIAL PROGRESSION: The player moves DOWN through the building.
+#   Phase 1: Floors 1-3 (routine patrol, everything normal)
+#   Phase 2: Floor 4 (Room 4B discovery)
+#   Phase 3: Floors 3-1 (each floor changed, descending)
+#   Phase 4: Basement (wrong hallways, the room at the end)
+#   Phase 5: Resolution (wherever the ending places them)
+
+phases:
+
+  # ───────────────────────────────────────────────
+  # PHASE 1: THE SHIFT
+  # ───────────────────────────────────────────────
+  # Design goal: Aggressive normalcy. The building is boring. The job is boring.
+  # The full ambient soundscape is present. Doors are locked. Clipboard gets checked.
+  # The player should feel the weight of routine — this makes the 4th floor wrongness
+  # land harder by contrast. Calibration window: read how the player interacts with space.
+
+  - id: the_shift
+    name: "The Shift"
+    time_range: "0:00-2:00"
+
+    purpose: >
+      Establish the hospital as a real, mundane, boring space. Calibrate the player's
+      interaction style (do they explore? ask questions? describe what they see?
+      express unease? act on the environment?). The player must feel safe enough
+      to engage genuinely — Phase 2 only works if Phase 1 made the routine feel real.
+      Completion criterion: player has checked at least one floor and the pipeline
+      has collected at least one player_style_score increment.
+
+    sound_state:
+      # Full ambient: every sound is present. This is the baseline.
+      active: [fluorescent_buzz, footsteps_echo, ventilation, distant_elevator]
+      removed: []
+      added: []
+
+    narrator_behavior: >
+      Clinical. Observational. Describe the building through physical sensation:
+      linoleum temperature through shoe soles, the pitch change of fluorescent
+      buzz between hallways, the specific smell of institutional cleaning product
+      on surfaces that haven't been cleaned in weeks. The narrator describes what
+      the player does as they do it — checking doors, marking the clipboard, walking
+      hallways. Lean into the mundane. The boredom is the safety.
+
+    beats:
+
+      # BEAT 1-1: Arrival
+      # The player's first moments in the building. The lobby. The clipboard.
+      # The full ambient soundscape hits immediately — this is what "normal" sounds like.
+
+      - id: beat-arrival
+        type: narration
+        word_budget: 150
+        purpose: >
+          The player arrives at St. Maren's Hospital. Midnight shift. The lobby is
+          lit, clean, empty. The security desk has a clipboard with a floor plan and
+          a checklist. Each door on each floor needs to be marked as locked. The pen
+          works. The clipboard is real. The building is a building.
+        prompt_hint: >
+          Open mid-arrival. The player is already inside, clipboard in hand. No
+          preamble about "arriving at the hospital." They are here. Describe the lobby:
+          the front desk stripped of computers, the elevator at the end of the hall,
+          the stairwell door propped open with a rubber wedge. The fluorescents are on.
+          The ventilation is running. The building smells like floor polish and cold air.
+          First instruction: "Four floors. Every door. Mark them locked."
+        sound_cues:
+          - sound_id: door_check
+            trigger: beat_start
+            volume: 0.3
+            # First door check — establishing the routine
+
+      # BEAT 1-2: The Routine
+      # Floors 1-3. Doors locked. Clipboard marked. Normal.
+      # This beat runs until the phase timer reaches 2:00 or sufficient
+      # player_style data has been collected.
+
+      - id: beat-routine
+        type: narration
+        word_budget: 200
+        purpose: >
+          Standard patrol. The player walks floors 1-3, checking doors. Every door
+          is locked. The clipboard accumulates check marks. The hallways are empty.
+          The building sounds like a building at midnight. The narrator describes
+          each floor with one distinguishing detail: 1st floor smells like floor
+          polish, 2nd floor has the longest hallway, 3rd floor has a window at the
+          end with a view of the parking lot — the player's car is visible, headlights
+          off, alone. The routine is the calibration: HOW does the player walk through
+          this building? Do they rush? Do they linger? Do they talk to themselves?
+          Do they touch walls? Do they try doors that aren't on the list?
+        prompt_hint: >
+          The narrator describes the building as the player moves through it. Each
+          floor gets 2-3 sentences maximum. The clipboard marks accumulate. The
+          player may ask questions ("what's behind this door?", "how old is this
+          building?") — answer with physical details, not history. The history
+          comes later. The building is concrete, linoleum, fluorescent light, and
+          the smell of industrial disinfectant. Nothing more. Yet.
+          [SOUND:clipboard_mark] — use each time a door is marked.
+          [SOUND:door_check] — use each time a door handle is tested.
+        sound_cues:
+          - sound_id: clipboard_mark
+            trigger: player_action
+            volume: 0.25
+          - sound_id: door_check
+            trigger: player_action
+            volume: 0.3
+        state_changes:
+          game.flags.floors_1_3_cleared: true
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 2: ROOM 4B
+  # ───────────────────────────────────────────────
+  # Design goal: One wrong thing. Just one. A door that is open. A chart with a name.
+  # The horror is not in what happens — it is in the specificity of the wrongness.
+  # A chart does not have your name on it unless someone put it there.
+  # Someone put it there. The building is empty. No one put it there.
+  # Sound changes: ventilation gets louder, distant elevator stops (it arrived).
+
+  - id: room_4b
+    name: "Room 4B"
+    time_range: "2:00-4:00"
+
+    purpose: >
+      The player reaches the 4th floor. Every door is locked except Room 4B.
+      Inside: a patient chart with the player's name. The admission reason is blank.
+      The player faces their first choice. The elevator arrives unbidden.
+      Completion criterion: Choice 1 has been resolved, the chart has been discovered,
+      and the player has interacted with Room 4B.
+
+    sound_state:
+      active: [fluorescent_buzz, footsteps_echo, ventilation]
+      removed: [distant_elevator]
+      added: []
+      volume_adjustments:
+        ventilation: 0.18
+        # Ventilation gets louder — filling the silence left by the elevator.
+        # The building compensates. The 4th floor breathes more heavily.
+
+    narrator_behavior: >
+      The same clinical neutrality as Phase 1. The narrator does not change tone
+      when describing Room 4B. It describes the open door the same way it described
+      locked doors — as a fact. The chart is described physically first (weight,
+      paper quality, ink color) before its content (the player's name). The narrator
+      does not react to the name. It states it. The player reacts. The narrator waits.
+      When describing the elevator arriving, the narrator notes it as fact:
+      "The elevator is at the end of the hall. Its button is lit. It was not lit before."
+      No interpretation. No suggestion that this is unusual. Just what is there.
+
+    beats:
+
+      # BEAT 2-1: The Fourth Floor
+      # The player reaches the 4th floor. Every door is locked. Except one.
+      # The open door is described with the same neutrality as the locked ones.
+      # The narrator does not flag it. The player notices.
+
+      - id: beat-fourth-floor
+        type: narration
+        word_budget: 100
+        purpose: >
+          The player walks the 4th floor hallway. Door after door: locked. The
+          clipboard marks accumulate. Then Room 4B. The door is ajar. Not broken.
+          Not forced. Ajar. The hallway light falls into the room at an angle.
+          The narrator describes the open door with the same clinical tone as every
+          locked door. The wrongness is in the break of pattern, not in the description.
+        prompt_hint: >
+          "4A. Locked. 4C. Locked. 4D. Locked." Build the rhythm of checking.
+          Then: "4B." And stop. The door is open. Describe the physical state of
+          the door — the angle, the light, the gap between door and frame.
+          Do not say "something is wrong." Say what is there. The player decides
+          what is wrong. [SOUND:door_creak] — the door shifts slightly as the
+          player approaches, settling on its hinges.
+        sound_cues:
+          - sound_id: door_creak
+            trigger: beat_start
+            volume: 0.25
+
+      # BEAT 2-2: The Chart
+      # Inside Room 4B. The bed. The chart. The player's name.
+      # The most important narrative beat in the story. Restraint is critical.
+      # Describe the chart as a physical object first. Then the content.
+
+      - id: beat-the-chart
+        type: narration
+        word_budget: 120
+        purpose: >
+          Inside Room 4B: hospital bed, stripped mattress, bedside table, window
+          with blinds down. On the bed — centered, placed deliberately — a patient
+          intake chart. St. Maren's letterhead. The player's full name in the
+          name field. Admission date: today. Admission reason: blank. Attending
+          physician: blank. The chart smells like fresh toner.
+          This is the story's central horror object. It must be described with
+          maximum physical specificity. The narrator gives the player time to process.
+        prompt_hint: >
+          Physical first: the weight of the clipboard, the texture of the paper,
+          the font of the hospital letterhead. Then the content: "The name field
+          reads [player name]." One sentence. Then describe the blank fields.
+          "The admission reason line is empty. The attending physician line is empty."
+          Do not explain. Do not speculate. State what is on the chart. Stop.
+          The room is cold. The player can see their breath. The fluorescents
+          in Room 4B are off — only the hallway light reaches in.
+
+      # BEAT 2-3: CHOICE 1 — The Chart
+      # What does the player do with the chart? Read it fully? Take it?
+      # Leave it? This is the first style-scoring moment.
+
+      - id: beat-choice-1
+        type: choice
+        word_budget: 80
+        purpose: >
+          The player has found a chart with their name on it. What do they do?
+          This is Choice 1 (~2:30). Each response style advances a different
+          player_style score. The narrator presents the choice implicitly:
+          "You could open the chart. Or leave it on the bed."
+        prompt_hint: >
+          The narrator does not present options explicitly. It describes the
+          situation and waits. "The chart is on the bed. Your name is on it.
+          You could open it. Or leave it where it is." Then silence.
+          The player's response reveals their style. If they don't respond
+          within 10 seconds: "The chart is still on the bed."
+        options:
+
+          - id: read-chart
+            label: "Read the chart thoroughly — analytical response"
+            player_says_like:
+              - "Let me read it. What else does it say?"
+              - "Open it. I want to see the full chart."
+              - "I'm going to read every line of this."
+              - "What does the rest of the chart say?"
+              - "Show me the whole thing."
+            consequence: >
+              The narrator opens the chart fully. Additional pages: a medical
+              history that is blank. Medication: blank. Notes: a single line
+              in typewritten text: "Patient admits to recurring episodes of
+              nocturnal patrol." The player chose to investigate. They want data.
+              They want to understand the mechanism. This is analytical engagement.
+            state_changes:
+              game.player_style_scores.analytical: "+2"
+              game.flags.chart_read: true
+            style_score:
+              analytical: 2
+
+          - id: take-chart
+            label: "Take the chart — confrontational response"
+            player_says_like:
+              - "I'm taking this with me."
+              - "I'm keeping this. This is evidence."
+              - "I'm not leaving this here."
+              - "This is mine. I'm taking it."
+              - "I'll take this to the security office."
+            consequence: >
+              The narrator describes the player picking up the chart. It is
+              lighter than expected. The clipboard underneath is clean — no dust,
+              no mark. As if the chart was placed here moments ago. The player
+              is acting on the environment. They are claiming territory. This is
+              confrontational engagement with the space.
+            state_changes:
+              game.player_style_scores.confrontational: "+2"
+              game.flags.chart_taken: true
+            style_score:
+              confrontational: 2
+
+          - id: leave-chart
+            label: "Leave it and back away — nurturing/protective response"
+            player_says_like:
+              - "I'm not touching that."
+              - "Leave it. I'm going to keep checking the other doors."
+              - "I shouldn't be in here. I'll close the door."
+              - "That's not right. I'll report it in the morning."
+              - "I'll leave it and come back later."
+            consequence: >
+              The narrator describes the player stepping back. The hallway is
+              still lit. The other doors are still locked. The building is still
+              a building. The player chose caution. They are protecting themselves
+              from the wrongness by maintaining the routine. This is nurturing-
+              protective engagement — preserve the normal, don't disturb.
+            state_changes:
+              game.player_style_scores.nurturing: "+2"
+              game.flags.chart_left: true
+            style_score:
+              nurturing: 2
+
+          - id: react-emotionally
+            label: "Express feeling about the chart — empathetic response"
+            player_says_like:
+              - "That's my name. How is that my name?"
+              - "This doesn't feel right. Something is wrong here."
+              - "I feel like I shouldn't be seeing this."
+              - "This is making me uncomfortable. Why does this have my name?"
+              - "I don't understand why this is here."
+            consequence: >
+              The narrator pauses. The building pauses. The ventilation's breathing
+              pattern shifts — one beat longer than usual. The player is processing
+              the wrongness through feeling, not action. They acknowledged the
+              emotional weight of seeing their name on a patient chart. The building
+              noticed. The empathetic response changes the room temperature —
+              it gets one degree warmer. The narrator does not comment on this.
+            state_changes:
+              game.player_style_scores.empathetic: "+2"
+              game.flags.emotional_reaction: true
+            style_score:
+              empathetic: 2
+
+      # BEAT 2-4: The Elevator
+      # The elevator arrives at the 4th floor. The player did not call it.
+      # Its doors are open. It waits.
+
+      - id: beat-elevator
+        type: narration
+        word_budget: 80
+        purpose: >
+          The elevator arrives at the 4th floor unbidden. The distant machinery
+          sound has been replaced by the close arrival sound. The doors are open.
+          The light inside is on. It is waiting. The stairwell door on the 4th
+          floor is now locked — from the outside. The elevator is the only way down.
+          This beat transitions the player from the 4th floor to Phase 3.
+        prompt_hint: >
+          "The elevator is at the end of the hall. Its doors are open. The light
+          inside is on." Then: "The stairwell door does not open." Two facts.
+          The player can go down in the elevator or stay on the 4th floor.
+          If they stay: "The elevator waits." After 15 seconds: "The elevator
+          is still waiting." The building is patient.
+          [SOUND:elevator_arrive] fires from timeline — do not trigger manually.
+        sound_cues:
+          - sound_id: elevator_arrive
+            trigger: timeline
+            volume: 0.35
+        state_changes:
+          game.flags.elevator_arrived: true
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 3: GOING DEEPER
+  # ───────────────────────────────────────────────
+  # Design goal: The building has changed. Each floor the player passes through
+  # is different from their first round. The changes are specific and wrong.
+  # Sounds disappear floor by floor. A second chart appears — in the player's
+  # handwriting. The building's geometry is starting to shift. The elevator
+  # follows the player. It always goes down.
+
+  - id: going_deeper
+    name: "Going Deeper"
+    time_range: "4:00-6:00"
+
+    purpose: >
+      Each floor has changed since Phase 1. Sounds disappear floor by floor.
+      A second chart appears in the player's handwriting. The elevator follows.
+      The building's geometry is subtly wrong. Choice 2 occurs here.
+      Completion criterion: Choice 2 resolved, second chart discovered, player
+      has traversed at least 2 floors and noticed changes.
+
+    sound_state:
+      # By end of phase: only footsteps and the hospital drone remain.
+      # fluorescent_buzz and ventilation removed during descent.
+      active: [footsteps_echo, hospital_drone]
+      removed: [fluorescent_buzz, ventilation]
+      added: [hospital_drone]
+      volume_adjustments:
+        footsteps_echo: 0.25
+        # Footsteps get slightly louder — echoes longer, hallways emptier.
+        # The player's own sound is now the dominant ambient presence.
+
+    narrator_behavior: >
+      The same clinical neutrality. The narrator describes each floor's changes
+      as facts. If the player says "this wasn't like this before," the narrator
+      does not confirm or deny. It describes the next detail. The 3rd floor
+      has open doors and made beds. The 2nd floor is dark and damp. The 1st
+      floor lobby is unchanged except the front doors are chained from outside.
+      Each description is physical: dimensions, temperatures, surfaces, light
+      quality. The narrator never says "wrong" or "strange." It says "the hallway
+      is 12 meters longer than the building footprint allows."
+
+    beats:
+
+      # BEAT 3-1: Changed Floors
+      # Each floor is different. The changes are specific and wrong.
+      # Sounds disappear as the player descends.
+
+      - id: beat-changed-floors
+        type: narration
+        word_budget: 200
+        purpose: >
+          The player descends through floors that have changed. 3rd floor: three
+          doors now open (3A, 3C, 3F), beds inside are made with hospital corners,
+          fresh sheets. 2nd floor: fluorescents off, emergency exit signs cast red
+          light every 30 feet, floor is damp, pipes groan in the walls. 1st floor:
+          lobby unchanged except front doors are chained from outside through the glass.
+          The chain was not there when the player arrived. Each floor removes a
+          sound layer. By the 1st floor, only footsteps and ventilation-that-sounds-
+          like-breathing remain.
+        prompt_hint: >
+          One distinguishing detail per floor. 3rd floor: "The beds are made.
+          Hospital corners. The sheets smell like laundry detergent." 2nd floor:
+          "The floor is wet. The pipes in the wall groan once, then stop."
+          1st floor: "The front doors are visible. There is a chain through the handles.
+          It was not there two hours ago."
+          [SOUND:fluorescent_flicker] — on 3rd floor, lights behaving abnormally.
+          [SOUND:pipe_groan] — on 2nd floor, a single pipe groan.
+          The building is longer than it should be. State this as measurement:
+          "The 3rd floor hallway is 12 meters longer than your first pass."
+        sound_cues:
+          - sound_id: fluorescent_flicker
+            trigger: "floor_3"
+            volume: 0.18
+          - sound_id: pipe_groan
+            trigger: "floor_2"
+            volume: 0.15
+
+      # BEAT 3-2: The Second Chart
+      # Found on the 2nd floor, propped against a door frame.
+      # Same letterhead. Same name. But the handwriting is the player's own.
+      # "Recurring episodes. Patient believes they are a security guard."
+
+      - id: beat-second-chart
+        type: narration
+        word_budget: 100
+        purpose: >
+          The second chart appears on the 2nd floor. Propped against a door frame
+          as if left for the player to find. Same St. Maren's letterhead. Same
+          patient name. But the handwriting is the player's own — the specific
+          slant, a letter formation they would recognize. The admission reason line
+          is no longer blank. It reads: "Recurring episodes. Patient believes they
+          are a security guard." Written in the player's handwriting.
+        prompt_hint: >
+          Physical first: "A chart. Propped against the door frame of Room 2D.
+          The same letterhead." Then: "The handwriting is yours." Describe the
+          specific handwriting — the slant, a specific letter (the way you cross
+          your t's, the way your r's connect to the next letter). Then the content.
+          One line: "Recurring episodes. Patient believes they are a security guard."
+          Do not explain. Do not interpret. State it. Stop. Wait.
+
+      # BEAT 3-3: CHOICE 2 — Down or Up
+      # The elevator is waiting. It will go to the basement.
+      # The stairs go up — back to the 4th floor, back to Room 4B.
+      # The player is holding two charts with their name on them.
+
+      - id: beat-choice-2
+        type: choice
+        word_budget: 80
+        purpose: >
+          The player must choose: take the elevator down (basement) or go up
+          (back to 4th floor, back to Room 4B). This is Choice 2 (~5:00).
+          Both paths lead to Phase 4 but the style scoring differs.
+          The narrator presents the spatial choice: "The elevator is waiting.
+          The stairs go up. You are holding two charts with your name on them."
+        prompt_hint: >
+          The choice is spatial, not emotional. The narrator describes what is
+          available: "The elevator doors are open. The light inside is on.
+          It will go down. The stairwell door is unlocked — it goes up, to the
+          4th floor. To Room 4B." The player chooses direction.
+        options:
+
+          - id: take-elevator-down
+            label: "Take the elevator to the basement — confrontational"
+            player_says_like:
+              - "I'm going down. Take me to the basement."
+              - "Let's see what's down there."
+              - "Basement. Let's go."
+              - "I want to see what's below."
+              - "Down."
+            consequence: >
+              The elevator descends. The player chose to go deeper into the
+              building's unknown territory. They are pushing forward, demanding
+              answers from the space itself. Confrontational: acting on the
+              environment, not retreating from it.
+            state_changes:
+              game.player_style_scores.confrontational: "+2"
+              game.flags.chose_elevator: true
+            style_score:
+              confrontational: 2
+
+          - id: go-back-to-4b
+            label: "Go back up to Room 4B — analytical"
+            player_says_like:
+              - "I need to go back to Room 4B. Something doesn't add up."
+              - "Let me check Room 4B again."
+              - "I want to compare the two charts. Back to 4B."
+              - "The answer is upstairs. I'm going back."
+              - "Room 4B. There has to be something I missed."
+            consequence: >
+              The player goes up. They want to return to the source — to compare,
+              to investigate, to understand the mechanism. Analytical: the player
+              is building a theory and testing it. The stairwell leads to the
+              4th floor. Room 4B is still open. The bed is made now. It wasn't
+              before. The elevator follows them up — the player hears it arrive
+              behind them.
+            state_changes:
+              game.player_style_scores.analytical: "+2"
+              game.flags.returned_to_4b: true
+            style_score:
+              analytical: 2
+
+          - id: try-to-leave
+            label: "Try to find a way out — nurturing/protective"
+            player_says_like:
+              - "I want to leave. Where's the exit?"
+              - "I need to get out of here."
+              - "I'm going to try the front doors again."
+              - "There has to be another way out."
+              - "I'm done with this. I want to leave the building."
+            consequence: >
+              The player tries to leave. The front doors are chained. The
+              emergency exits are sealed — not locked, sealed. The windows on
+              every floor do not break. The player can hit them and the narrator
+              describes the sound of impact with no result. The building does not
+              let them leave. But they tried. They prioritized safety over
+              curiosity. Nurturing-protective: self-preservation first.
+              The elevator is still waiting when they return to the hallway.
+            state_changes:
+              game.player_style_scores.nurturing: "+2"
+              game.flags.tried_to_leave: true
+            style_score:
+              nurturing: 2
+
+          - id: sit-down-and-wait
+            label: "Stop moving. Sit down. Wait. — empathetic"
+            player_says_like:
+              - "I'm going to sit down for a minute."
+              - "I need to think about this."
+              - "I'm not going anywhere until I understand what I'm feeling."
+              - "Something is happening and I need to be still."
+              - "Let me just... stop. For a moment."
+            consequence: >
+              The player stops. They sit in the hallway. The building is quiet
+              around them. The ventilation's breathing pattern slows — one beat
+              longer between cycles. The fluorescent flicker in the nearest
+              light steadies. The building is responding to the player's stillness.
+              It was waiting for them to stop moving. Empathetic: the player is
+              processing through feeling, not action. The building noticed.
+              After 20 seconds: "The elevator is still waiting."
+            state_changes:
+              game.player_style_scores.empathetic: "+2"
+              game.flags.player_sat_down: true
+            style_score:
+              empathetic: 2
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 4: THE BASEMENT
+  # ───────────────────────────────────────────────
+  # Design goal: The building stops pretending. Wrong hallways. Wrong numbers.
+  # A door with light behind it. A room identical to 4B. Something in the bed.
+  # Near-silence except footsteps, heartbeat, sub-bass.
+  # The revelation variant fires here based on accumulated player_style_scores.
+  # The approach to the room must be slow. Three steps. Three details.
+
+  - id: the_basement
+    name: "The Basement"
+    time_range: "6:00-8:00"
+
+    purpose: >
+      The basement hallways should not exist. A door with light behind it
+      leads to a room identical to 4B. Something is in the bed. The revelation
+      fires based on player_style_scores. The final choice is offered after.
+      Completion criterion: revelation variant delivered, Choice 3 resolved,
+      ending route determined.
+
+    sound_state:
+      # All original ambient removed except footsteps.
+      # Heartbeat and sub-bass enter. Building drone fades.
+      active: [footsteps_echo, heartbeat, sub_bass]
+      removed: [fluorescent_buzz, ventilation, distant_elevator, hospital_drone]
+      added: [heartbeat, sub_bass]
+      volume_adjustments:
+        footsteps_echo: 0.28
+        # Footsteps louder still — the echo is wrong, longer than the hallway
+        # dimensions should allow. The basement hallways are longer than the building.
+        heartbeat: 0.25
+        # 40 BPM. Too slow. From the room at the end.
+        sub_bass: 0.06
+        # Felt, not heard. The player's chest is heavy.
+
+    narrator_behavior: >
+      The narrator describes the basement hallways with the same clinical precision
+      as the upper floors — but the facts it states are impossible. "The hallway
+      extends forty meters. The building footprint is thirty meters wide." The narrator
+      does not acknowledge the contradiction. It describes the doors, the numbers
+      (which skip and repeat), the light at the end. The approach to the room is
+      the slowest section: each step reveals one detail. The narrator does not rush.
+      The revelation is delivered in the same flat observational tone as every other
+      fact in the story. The shape in the bed. What it is. Stated. Stopped.
+
+    beats:
+
+      # BEAT 4-1: The Wrong Hallways
+      # The basement does not match the building plans.
+      # The narrator states impossible measurements as fact.
+
+      - id: beat-wrong-hallways
+        type: narration
+        word_budget: 120
+        purpose: >
+          The elevator opens onto a hallway that should not exist. The hospital
+          basement plan is simple: boiler room, storage, laundry. This hallway
+          has patient rooms. The doors have numbers that skip and repeat. 4B appears
+          twice. The hallway is longer than the building. The ceiling is lower.
+          The lights are off except at the far end — one door, warm light behind it.
+        prompt_hint: >
+          "The elevator opens. The hallway extends ahead. It has patient rooms."
+          Then the impossible measurement: "The hallway is forty meters long.
+          The building above is thirty meters wide." Do not comment on this.
+          The heartbeat is audible now — from the far end, from the room with
+          light. The sub-bass creates chest pressure. The narrator describes
+          what the player's body feels: heavy, slow, as if the air is thicker.
+          The door at the end is open the same width as Room 4B on the 4th floor.
+          The same angle. State this. Stop.
+
+      # BEAT 4-2: The Approach
+      # Three steps. Three details. The slowest narration in the experience.
+      # Each step closer to the bed reveals one more thing.
+
+      - id: beat-approach
+        type: narration
+        word_budget: 100
+        purpose: >
+          The player approaches the room. Three steps. Three sentences.
+          Step 1: The room is identical to 4B. Same bed. Same bedside table.
+          Same window — but the window shows a hallway, not outside.
+          Step 2: The bed. The sheet. Something under it. It rises and falls.
+          Step 3: The revelation variant fires. What is in the bed (or not in
+          the bed) depends on the dominant player_style_score.
+        prompt_hint: >
+          One detail per step. Slow. The heartbeat is the pacing mechanism —
+          each sentence lands on a beat. 40 BPM gives ~1.5 seconds per beat.
+          Step 1: "The room is Room 4B. The bed. The table. The window shows
+          a hallway where outside should be." Step 2: "The sheet rises. Falls.
+          Rises. The heartbeat is coming from the bed." Step 3: the revelation.
+          Variant-specific (see phase-overrides.yaml phase_4_the_basement).
+          [SOUND:breath_close] — only if the player is standing at the bedside.
+          A single exhale. Then nothing.
+        sound_cues:
+          - sound_id: breath_close
+            trigger: player_proximity
+            volume: 0.4
+
+      # BEAT 4-3: The Revelation
+      # What is in the bed. The variant fires based on player_style.
+      # The narrator states what is there. No interpretation. No explanation.
+      # 2 seconds of silence preceded this (timeline.yaml at 7:30).
+
+      - id: beat-revelation
+        type: revelation
+        word_budget: 150
+        purpose: >
+          The revelation. What is in the bed, or what the chart says, or what
+          the room has become — determined by dominant player_style_score.
+          The narrator states the revelation with the same tone as every other
+          observation. No heightened language. No drama. The horror is in the
+          flatness of the delivery. "The face on the pillow is yours."
+          Six words. Then silence. The player processes.
+        prompt_hint: >
+          Deliver the active variant's revelation exactly as written in the
+          phase override. Then stop. Do not elaborate. Do not explain. Do not
+          continue until the player speaks. If the player is silent for 15
+          seconds: "The chart is still on the bedside table." Not a prompt —
+          a fact. The chart is there. It waits for the player the way the
+          building waits for the player.
+        sound_cues:
+          - sound_id: silence_full
+            trigger: beat_start
+            volume: 0.0
+        state_changes:
+          game.flags.revelation_delivered: true
+          game.active_variant: "determined_by_revelation_logic"
+
+      # BEAT 4-4: CHOICE 3 — The Final Choice
+      # The chart. What does the player do with it?
+      # This is the final choice and it determines the ending.
+
+      - id: beat-choice-3
+        type: choice
+        word_budget: 80
+        purpose: >
+          The final choice. The chart is on the bedside table. The admission
+          reason line — blank in Phase 2 — is filling itself in. What does the
+          player do? This choice, combined with the revelation variant, determines
+          the ending. Choice 3 (~7:30).
+        prompt_hint: >
+          The narrator does not present options explicitly. The chart is there.
+          The pen is there. "The admission reason line is filling in. The pen
+          is on the table. The door behind you is still open."
+          The player acts. If they don't act within 15 seconds:
+          "The chart is still being written."
+        options:
+
+          - id: sign-the-chart
+            label: "Sign the chart — accept the admission"
+            player_says_like:
+              - "Give me the pen. I'll sign it."
+              - "I'll sign the chart."
+              - "Fine. I'll sign it. This is mine."
+              - "If this is my chart, I'll sign it myself."
+              - "Let me sign the attending physician line."
+            consequence: >
+              The player picks up the pen. It works. The signature is clean.
+              The attending physician line now has their name — twice. Patient
+              and physician. The same person. The hospital accepts this.
+              The fluorescents in the room flicker on. The building hums.
+              This is acceptance. Integration. The hospital was always theirs.
+            state_changes:
+              game.choices.final_choice: "sign"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+
+          - id: walk-away
+            label: "Walk away — leave the chart, leave the room"
+            player_says_like:
+              - "I'm walking away."
+              - "I'm leaving this room."
+              - "I don't want to see this."
+              - "I'm going back to the elevator."
+              - "I'm done. I'm leaving."
+            consequence: >
+              The player turns. The door is open. The hallway is lit. They walk.
+              The building does not stop them. The elevator is waiting — doors
+              open, light on. It goes up. The front doors are unlocked. The chain
+              is gone. The parking lot. Dawn light. The building lets them go.
+              This is release. But the chart is still down there. Filling itself in.
+            state_changes:
+              game.choices.final_choice: "leave"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+
+          - id: tear-the-chart
+            label: "Destroy the chart — refuse the narrative"
+            player_says_like:
+              - "Tear it up. Destroy the chart."
+              - "I'm ripping this thing apart."
+              - "This isn't real. I'm destroying it."
+              - "No. I refuse. I'm tearing the chart."
+              - "Get rid of it."
+            consequence: >
+              The player tears the chart. The paper rips. The pieces fall.
+              Another chart appears on the bedside table. Same name. Same content.
+              The player tears that one. Another appears. The cycle does not stop.
+              The building produces charts the way lungs produce breath.
+              The player can keep tearing or they can stop. Either way: the
+              hallway extends. The doors have numbers. They keep going.
+              This is dissolution. The building does not end. Neither does the chart.
+            state_changes:
+              game.choices.final_choice: "destroy"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+
+          - id: read-the-reason
+            label: "Read what the admission reason says now"
+            player_says_like:
+              - "What does it say now? Read it."
+              - "I want to know what the admission reason is."
+              - "Tell me what the chart says."
+              - "Let me read the admission reason."
+              - "What's being written?"
+            consequence: >
+              The player reads. The admission reason is filling in, line by line.
+              The content depends on the revelation variant — the doppelganger's
+              chart says "Recurring episodes of self-observation." The system's
+              chart fills with procedural language. The patient's chart says
+              "Waiting. Thirty-nine years." The reality break's chart says
+              "Transfer from [the other hospital]. Reason: overlap."
+              The player now knows. What they do with knowing determines the ending.
+              This is the empathetic response — the willingness to look at the truth.
+            state_changes:
+              game.choices.final_choice: "read"
+              game.flags.ending_route: "determined_by_revelation_and_choice"
+            requires:
+              trust_level_min: 0  # Available to all — reading requires no trust
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 5: RESOLUTION
+  # ───────────────────────────────────────────────
+  # Design goal: The emotional landing. The ending plays out.
+  # The narrator's tone does not change. The building resolves (or doesn't).
+  # The last thing the player hears is one sentence. Specific to the ending.
+  # Then silence. The experience is over.
+
+  - id: resolution
+    name: "Resolution"
+    time_range: "8:00-10:00"
+
+    purpose: >
+      The ending plays out based on revelation variant + Choice 3.
+      The narrator delivers the ending with the same clinical neutrality as Phase 1.
+      The horror is that the voice never changed — the world changed around it.
+      Completion criterion: denouement beat complete, closing beat complete, session ends.
+
+    sound_state:
+      # Ending-specific. See phase-overrides.yaml phase_5_resolution and timeline.yaml.
+      active: [ending_specific]
+      removed: [heartbeat]
+      added: [ending_specific]
+
+    narrator_behavior: >
+      The same narrator. The same voice. The same clinical observation. The building
+      is resolving — or not — and the narrator describes it with the same precision
+      as it described the lobby in Phase 1. This is the final horror: the narrator
+      was never afraid. The narrator was never surprised. The narrator was always
+      just describing what is there. The player was the only one who felt anything.
+      The building does not feel. The narrator does not feel. The player is alone
+      with their own response to what they saw.
+
+    beats:
+
+      # BEAT 5-1: Denouement
+      # The ending plays out. Specific to the ending variant.
+
+      - id: beat-denouement
+        type: narration
+        word_budget: 150
+        purpose: >
+          The ending. The specific content depends on revelation variant + Choice 3.
+          Integration: the player signs, the hospital accepts, lights return.
+          Consumption: the player wakes in the bed, morning, loop.
+          Release: the doors unlock, dawn, parking lot, escape.
+          Dissolution: the hallways keep going, all sounds return, no end.
+          The narrator delivers each with identical clinical neutrality.
+        prompt_hint: >
+          Consult phase-overrides.yaml phase_5_resolution for specific content.
+          Core requirements regardless of ending:
+          1. Reference at least one detail from Phase 1 (the routine, the clipboard,
+             a specific door the player checked) to create a callback.
+          2. The narrator's tone does not change. The building is the building.
+          3. Sound design per ending (see timeline.yaml Phase 5 section).
+          4. Brevity. The ending should not sprawl. State what happened. Stop.
+        sound_cues:
+          - sound_id: ending_specific
+            trigger: beat_start
+            volume: 0.4
+
+      # BEAT 5-2: Closing
+      # The final line. The experience ends.
+
+      - id: beat-closing
+        type: narration
+        word_budget: 50
+        purpose: >
+          The final image. The final sound. The session ends.
+          The last line MUST be the ending-specific line from phase-overrides.yaml:
+          - Integration: "The chart is signed. The hospital is yours."
+          - Consumption: "Your shift starts in twelve hours."
+          - Release: "You do not look back."
+          - Dissolution: "You are still walking."
+          After the last line: silence. The experience is over. The narrator
+          does not continue. The building does not continue. Only the player
+          continues, carrying what they heard.
+        prompt_hint: >
+          One sentence. The final sentence. Then nothing.
+          No postscript. No epilogue. No "thank you for playing."
+          The experience ends mid-world. The building existed before the player
+          arrived and it will exist after they leave. If they left.
+        sound_cues:
+          - sound_id: session_end
+            trigger: beat_end
+            volume: 0.0
+        state_changes:
+          game.flags.session_complete: true
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REVELATION LOGIC
+# ─────────────────────────────────────────────────────────────────────────────
+# Maps dominant player_style_score at Phase 4 entry to revelation variant id.
+# The pipeline calculates which score is highest at Phase 4 entry and selects.
+#
+# Tie-breaking order: empathetic > nurturing > analytical > confrontational
+#
+# Maximum possible score per style across all 3 choice beats:
+#   empathetic:       2 (choice-1 react-emotionally) + 2 (choice-2 sit-down-and-wait) = 4 max
+#   analytical:       2 (choice-1 read-chart) + 2 (choice-2 go-back-to-4b) = 4 max
+#   nurturing:        2 (choice-1 leave-chart) + 2 (choice-2 try-to-leave) = 4 max
+#   confrontational:  2 (choice-1 take-chart) + 2 (choice-2 take-elevator-down) = 4 max
+#
+# With Choice 3 not scored (Choice 3 determines ending, not revelation).
+# A player who mixes styles will hit the tie-break — empathetic wins ties.
+
+revelation_logic:
+  empathetic: doppelganger
+  # Player processed through feeling. They expressed emotional response to the chart,
+  # they stopped to sit and feel. The revelation is personal: they are watching
+  # themselves sleep. The horror is recognition.
+
+  analytical: the_system
+  # Player investigated. Read the chart fully. Went back to compare. The revelation
+  # is procedural: the chart fills itself in. The horror is bureaucratic — the system
+  # knows them better than they know themselves.
+
+  nurturing: the_patient
+  # Player protected themselves. Left the chart. Tried to leave. The revelation
+  # is a person: a patient who died here, who has been waiting. The horror is
+  # unfinished business — someone needed a guard to check this room.
+
+  confrontational: reality_break
+  # Player acted on the environment. Took the chart. Took the elevator down.
+  # The revelation is spatial: the room is Room 4B but from a different hospital.
+  # The horror is that reality has edges and the player just found one.
+
+  tie: doppelganger
+  # Default when no style dominates. Empathetic wins ties.
+  # The doppelganger revelation is the most universally resonant — everyone
+  # has wondered what they look like when they sleep.
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDING CONDITIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# Evaluation rules checked when Phase 5 begins (post-revelation, post-Choice 3).
+# First condition whose trigger evaluates to true determines the ending loaded.
+# Order matters: most specific conditions first, default fallback last.
+#
+# Four primary endings. The ending_id maps to the ending mode in phase-overrides.yaml
+# phase_5_resolution and the conditional branches in timeline.yaml Phase 5.
+
+ending_conditions:
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 1: INTEGRATION
+  # Player signed the chart.
+  # ─────────────────────────────
+  # The hospital is theirs. They accepted. The lights return.
+  # The most "resolved" ending — the player made peace with the building.
+
+  - id: ending-integration
+    ending_name: "Integration"
+    trigger:
+      choices:
+        beat-choice-3: sign
+    ending_file: null  # Content is in phase-overrides.yaml phase_5_resolution
+    ending_id: integration
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 2: CONSUMPTION
+  # Player signed, read, or sat with the chart + doppelganger/system variant.
+  # Falls through from specific triggers above if sign is paired with
+  # certain revelation variants.
+  # ─────────────────────────────
+  # The loop. Morning. Bed. Nurse voice. Shift starts in 12 hours.
+
+  - id: ending-consumption-read-doppelganger
+    ending_name: "Consumption — Doppelganger Read"
+    trigger:
+      revelation: doppelganger
+      choices:
+        beat-choice-3: read
+    ending_id: consumption
+
+  - id: ending-consumption-read-system
+    ending_name: "Consumption — System Read"
+    trigger:
+      revelation: the_system
+      choices:
+        beat-choice-3: read
+    ending_id: consumption
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 3: RELEASE
+  # Player walked away from the chart.
+  # ─────────────────────────────
+  # The hospital lets them go. Dawn. Parking lot. Freedom.
+
+  - id: ending-release
+    ending_name: "Release"
+    trigger:
+      choices:
+        beat-choice-3: leave
+    ending_file: null
+    ending_id: release
+
+  # ─────────────────────────────
+  # PRIMARY ENDING 4: DISSOLUTION
+  # Player destroyed the chart.
+  # ─────────────────────────────
+  # The hallways keep going. All sounds return. No end. No resolution.
+  # The most unsettling ending — not because something happened,
+  # but because nothing will stop happening.
+
+  - id: ending-dissolution
+    ending_name: "Dissolution"
+    trigger:
+      choices:
+        beat-choice-3: destroy
+    ending_file: null
+    ending_id: dissolution
+
+  # ─────────────────────────────
+  # FALLBACK ENDINGS
+  # For combinations not covered by primary endings above.
+  # ─────────────────────────────
+
+  - id: ending-sign-patient
+    ending_name: "Integration — Patient Variant"
+    trigger:
+      revelation: the_patient
+      choices:
+        beat-choice-3: sign
+    ending_id: integration
+    # The player signed the chart for a dead patient. Integration still fires,
+    # but the tone is sadder — they are completing the patient's admission
+    # thirty-nine years late. The fluorescents return but the room is warmer.
+
+  - id: ending-sign-reality
+    ending_name: "Integration — Reality Break Variant"
+    trigger:
+      revelation: reality_break
+      choices:
+        beat-choice-3: sign
+    ending_id: integration
+    # The player signed a chart from a different hospital. Integration fires,
+    # but the building that accepts them might not be this one.
+
+  - id: ending-read-patient
+    ending_name: "Release — Patient Read"
+    trigger:
+      revelation: the_patient
+      choices:
+        beat-choice-3: read
+    ending_id: release
+    # The player read the patient's chart. The patient waited thirty-nine years.
+    # Now someone read the chart. The patient can rest. The hospital releases both.
+
+  - id: ending-read-reality
+    ending_name: "Dissolution — Reality Read"
+    trigger:
+      revelation: reality_break
+      choices:
+        beat-choice-3: read
+    ending_id: dissolution
+    # The player read the chart from the other hospital. The two hospitals
+    # overlap now. The hallways extend in both directions. Neither building ends.
+
+  # ─────────────────────────────
+  # DEFAULT FALLBACK
+  # Catches any state combination not covered above.
+  # ─────────────────────────────
+
+  - id: ending-default
+    ending_name: "Default Fallback"
+    trigger: {}
+    # Empty trigger — always matches. Must be last in the array.
+    ending_id: integration
+    # Integration is the default because it provides the most complete closure.
+    # The narrator delivers the integration ending regardless of revelation variant.

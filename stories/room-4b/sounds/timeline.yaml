@@ -1,0 +1,506 @@
+# =============================================================================
+# timeline.yaml — Room 4B
+# Deterministic timed sound schedule — fires at specific elapsed game times
+# regardless of player choices.
+#
+# HOW IT WORKS:
+#   The pipeline runs a parallel timer track starting at game init (0:00).
+#   Each event fires when the elapsed clock matches the `time` field.
+#   Conditional events additionally check game_state before executing.
+#   This track is completely independent of player input — these ALWAYS fire.
+#
+# RELATIONSHIP TO cue-map.yaml:
+#   sound_id values reference keys in cue-map.yaml ambient, intermittent,
+#   atmospheric, transitions, and endings sections.
+#
+# DESIGN PRINCIPLE:
+#   The timeline is the spine of the horror. The player's choices shape
+#   the narrative; the timeline shapes the atmosphere. Both run simultaneously.
+#   The building goes quiet around the player whether they notice or not.
+#   Unlike The Last Session (subtractive isolation in a single room),
+#   Room 4B is subtractive across SPACE — each floor the player descends
+#   loses a layer of sound. The building dies from the top down.
+#
+# REMOVAL SEQUENCE:
+#   Phase 2 / 3:00  -> ventilation rhythm shifts (louder, filling silence)
+#   Phase 2 / 3:30  -> distant elevator stops (it arrived at player's floor)
+#   Phase 3 / 4:30  -> fluorescent buzz stops (2nd floor and below go dark)
+#   Phase 3 / 5:30  -> ventilation becomes ambiguous (breathing or machine?)
+#   Phase 4 / 6:00  -> ventilation stops completely (only footsteps remain)
+#   Phase 4 / 7:30  -> all sounds muted (pre-revelation silence)
+#
+# By Phase 4: only footsteps + heartbeat + sub_bass.
+# The player is walking through a silent building with something breathing.
+#
+# TIME FORMAT: MM:SS (elapsed game time from session start)
+# =============================================================================
+
+timeline:
+
+  # ---------------------------------------------------------------------------
+  # PHASE 1: Full Ambient — 0:00 to 2:00
+  # The hospital is alive with the sounds a building makes at midnight.
+  # Fluorescents buzz. Ventilation breathes. The elevator moves somewhere below.
+  # Footsteps echo on clean linoleum. This is the baseline of normalcy.
+  # The player's job is to check doors. The sounds confirm: this is a building.
+  # A real building. With systems that work. Nothing more.
+  # Duration: 2 minutes of boredom. Boredom is safety.
+  # ---------------------------------------------------------------------------
+
+  - time: "0:00"
+    action: start_ambient
+    sound_ids: [fluorescent_buzz, footsteps_echo, ventilation]
+    fade_in_seconds: 0
+    description: >
+      Game begins. Fluorescent buzz, footsteps on linoleum, and ventilation
+      system start immediately at baseline volumes. The hospital sounds like
+      a building at midnight — not threatening, not welcoming. Present.
+      These three sounds establish the sonic floor: electrical hum overhead,
+      rhythmic breathing from the ducts, and the player's own footsteps
+      confirming they are here and moving. Everything is working.
+
+  - time: "0:15"
+    action: start_intermittent
+    sound_ids: [distant_elevator]
+    description: >
+      Distant elevator begins its intermittent cycle 15 seconds after start.
+      The slight delay makes it feel organic — the building was already running
+      when the player arrived. The elevator moves every ~60 seconds with ±25s
+      variance. It is doing what elevators do in an empty building: cycling
+      to neutral, running diagnostics, resettling. Normal. Unremarkable.
+      Its regularity is the point. It will be missed when it stops.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 2: Room 4B — 2:00 to 4:00
+  # The player reaches the 4th floor. One door is open.
+  # Sound changes are spatial: the ventilation gets louder to fill the gap
+  # left by the elevator stopping. The building is compensating.
+  # The elevator stops being distant and becomes present — it arrives.
+  #
+  # PACING NOTE: Only two sound changes in this phase. Restraint is critical.
+  # The horror is in the CHART, not in the soundscape. The soundscape shifts
+  # just enough to make the player's skin prickle without distracting from
+  # the narrative discovery of the chart with their name on it.
+  # ---------------------------------------------------------------------------
+
+  - time: "3:00"
+    action: volume_adjust
+    sound_id: ventilation
+    target_volume: 0.18
+    fade_duration_seconds: 8
+    description: >
+      Ventilation volume increases from 0.12 to 0.18 over 8 seconds.
+      The slow increase is imperceptible as an event — the player will not
+      notice the ventilation getting louder. They will notice that the 4th
+      floor feels different. Heavier. The air is thicker. The ventilation
+      is filling the silence left by the elevator that is about to stop.
+      This is the building compensating for the absence of one sound by
+      amplifying another. It is the first sign that the building responds
+      to the player's presence — but the player has no reason to suspect this yet.
+
+  - time: "3:30"
+    action: fade_out
+    sound_id: distant_elevator
+    fade_duration_seconds: 3
+    description: >
+      Distant elevator machinery stops. The 3-second fade mimics the motor
+      winding down as the elevator arrives at the player's floor. After this,
+      the elevator is no longer distant — it is HERE. The elevator_arrive
+      reactive cue handles the close-proximity sound. The critical implication:
+      the elevator came to the player. No one pressed the button on this floor.
+      No one pressed the button on any floor. The building sent it.
+
+  - time: "3:45"
+    action: play_once
+    sound_ids: [elevator_arrive]
+    description: >
+      The elevator arrives at the 4th floor — close proximity. Cable release,
+      hydraulic brake, doors opening. The player did not summon it. It arrived.
+      This is the first unexplained event in the soundscape — everything before
+      had a mundane explanation. This does not. The elevator is waiting.
+      Its doors are open. The light inside is on. It is ready.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 3: Going Deeper — 4:00 to 6:00
+  # Floor by floor, sounds disappear. The building is dying from the top down.
+  # By the time the player reaches the 1st floor, only footsteps and the
+  # ventilation-that-sounds-like-breathing remain.
+  #
+  # SPATIAL SOUND DESIGN: Each floor transition removes a layer.
+  #   4th floor (already passed): full ambient minus distant elevator
+  #   3rd floor: hospital_drone enters underneath (building awareness)
+  #   2nd floor: fluorescent buzz stops (lights are off on this floor)
+  #   1st floor: ventilation becomes ambiguous (breathing pattern shift)
+  #
+  # The building_drone entering at 4:00 is the only ADDITIVE event in the
+  # experience. Everything else is removal. The drone is the building's
+  # attention — it is paying attention to the player now.
+  # ---------------------------------------------------------------------------
+
+  - time: "4:00"
+    action: fade_in
+    sound_ids: [hospital_drone]
+    fade_in_seconds: 10
+    description: >
+      Building structural resonance drone enters over 10 seconds. At 0.1 volume,
+      this is below conscious perception on entry. The player will not hear it
+      start. They will feel the building change — heavier, more present, as if
+      the walls have moved slightly closer. The drone is the building becoming
+      aware that the player is still here. Still walking. Still checking doors.
+      The building expected the player to leave after finding the chart.
+      The player did not leave. The building is interested.
+
+  - time: "4:30"
+    action: fade_out
+    sound_id: fluorescent_buzz
+    fade_duration_seconds: 5
+    description: >
+      Fluorescent buzz fades out over 5 seconds. This corresponds to the player
+      reaching the 2nd floor, where the lights are off. The 5-second fade
+      simulates walking from a lit hallway into a dark one — the buzz fades
+      as the player leaves the light behind. The 2nd floor is lit only by
+      emergency exit signs. Red light every thirty feet. The darkness is real.
+      The silence where the buzz was is also real. The hallway feels wider
+      without the electrical hum overhead — as if the ceiling has risen.
+
+  - time: "5:00"
+    action: play_once
+    sound_ids: [phone_ring]
+    description: >
+      A phone rings on the same floor as the player. Three rings, then silence.
+      The phones in St. Maren's have been disconnected for weeks. The phone
+      ring is the building testing whether the player will investigate or
+      continue on their route. The narrator describes the sound but does not
+      comment on its impossibility. The player decides what it means.
+
+  - time: "5:30"
+    action: volume_adjust
+    sound_id: ventilation
+    target_volume: 0.14
+    fade_duration_seconds: 10
+    description: >
+      Ventilation volume decreases from 0.18 back to 0.14 over 10 seconds,
+      but the character of the sound changes. The rhythmic 4-1 breathing
+      pattern becomes less mechanical and more organic — the intervals become
+      slightly irregular, the airflow sound softens. This is not a volume
+      reduction — it is a transformation. The ventilation system is becoming
+      something else. By the end of this transition, the player cannot be
+      certain whether they are hearing ductwork or breathing. The ambiguity
+      is the horror. The narrator does not resolve it.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 4: The Basement — 6:00 to 8:00
+  # Near silence. The building has stopped pretending.
+  # Only footsteps remain from the original ambient soundscape.
+  # Sub-bass enters. Heartbeat enters. The player is inside something alive.
+  # The approach to the room at the end of the hallway is the slowest
+  # section of the experience — each step closer reveals one more detail.
+  #
+  # SOUND STATE AT 6:00:
+  #   Active: footsteps_echo, hospital_drone (barely audible)
+  #   Entering: sub_bass, heartbeat
+  #   Removed: fluorescent_buzz, ventilation, distant_elevator
+  #   The building is as quiet as it will ever be (until the full silence at 7:30).
+  # ---------------------------------------------------------------------------
+
+  - time: "6:00"
+    action: fade_out
+    sound_id: ventilation
+    fade_duration_seconds: 8
+    description: >
+      Ventilation stops completely over 8 seconds. The long fade is deliberate —
+      it should be ambiguous whether the ventilation stopped or whether the
+      player simply stopped hearing it. The breathing-that-was-ventilation
+      is gone. Or it isn't. The player is in the basement. There are no
+      ducts visible down here. The ventilation had no reason to reach this level.
+      After this fade, only footsteps and the hospital_drone remain from the
+      original soundscape. The drone is at the edge of perception.
+
+  - time: "6:00"
+    action: fade_in
+    sound_ids: [sub_bass]
+    fade_in_seconds: 8
+    description: >
+      Sub-bass infrasound enters simultaneously as ventilation fades.
+      The timing is not coincidental — one low-frequency sound replaces another,
+      but the character is entirely different. Ventilation was mechanical,
+      rhythmic, identifiable. Sub-bass is sourceless pressure. The player's
+      body registers the change before their mind does: something is here.
+      Something large. Something that has been here longer than the building.
+
+  - time: "6:30"
+    action: fade_in
+    sound_ids: [heartbeat]
+    fade_in_seconds: 6
+    description: >
+      Heartbeat enters 30 seconds after the sub-bass. 40 BPM. The player
+      hears it and knows — not consciously, but physically — that this is not
+      their heart. It is too slow. Too regular. Too deep. It comes from ahead,
+      from the end of the hallway, from the room with the light behind the door.
+      The heartbeat and the sub-bass together create the sensation of being
+      inside a body. The hospital is the body. The player is inside it.
+      The room at the end of the hallway is where the heart is.
+
+  - time: "7:00"
+    action: fade_out
+    sound_id: hospital_drone
+    fade_duration_seconds: 4
+    description: >
+      Building drone fades out. The building is no longer paying attention
+      to the player from a distance — the player is now inside whatever the
+      building contains. The drone served its purpose: it guided the player
+      down. Now only footsteps, heartbeat, and sub-bass remain.
+      The building has stopped being a building. It is now a corridor leading
+      to a room. The room is everything. The corridor is the approach.
+
+  - time: "7:30"
+    action: mute_all
+    fade_duration_seconds: 0.3
+    description: >
+      ALL sounds mute simultaneously over 0.3 seconds. Footsteps, heartbeat,
+      sub_bass — everything goes silent. The 0.3s prevents an audio click
+      while still feeling instantaneous. This is the pre-revelation silence.
+      Two seconds of nothing. The player is standing at the threshold of the
+      room at the end of the hallway. The door is open. The light is warm.
+      The shape in the bed is visible. And there is no sound at all.
+      Two seconds. The longest two seconds in the experience.
+
+  - time: "7:32"
+    action: fade_in
+    sound_ids: [heartbeat]
+    fade_in_seconds: 4
+    description: >
+      The heartbeat returns alone from the silence. 40 BPM. Louder now — 0.35
+      volume instead of 0.25. The player is in the room. The heartbeat is
+      close. It is coming from the bed. The sub-bass does not return.
+      The footsteps do not return — the player has stopped walking.
+      Only the heartbeat. Only the shape in the bed. Only the chart.
+      The revelation fires based on player_style_scores.
+
+  # ---------------------------------------------------------------------------
+  # PHASE 5: Resolution — 8:00 to 10:00
+  # Ending-specific sounds. Only ONE of these four conditional branches
+  # executes per playthrough — the one matching game_state.ending_id.
+  #
+  # FOUR ENDINGS:
+  #   integration   — The player signs the chart. Fluorescents return. Theirs.
+  #   consumption   — The player wakes in the bed. Morning. Loop.
+  #   release       — The hospital lets them go. Dawn. Cold air.
+  #   dissolution   — The hallways keep going. All sounds hold. Infinite.
+  #
+  # All endings fade out the Phase 4 heartbeat first, then bring in the
+  # ending-specific sound signature.
+  # ---------------------------------------------------------------------------
+
+  - time: "8:00"
+    action: fade_out
+    sound_id: heartbeat
+    fade_duration_seconds: 3
+    condition: null  # Always fires — heartbeat ends regardless of ending
+    description: >
+      Heartbeat fades out over 3 seconds as the resolution begins.
+      This clears the rhythmic anchor for the ending-specific sounds.
+      Fires unconditionally — all four endings share this transition.
+      The heartbeat stopping is the last thing the building does before
+      the ending takes over. Whatever was breathing in the bed has either
+      been identified or is no longer relevant.
+
+  # --- INTEGRATION ENDING ---
+  # The player accepted the chart. Signed it. The hospital is theirs.
+  # Not as a prison — as a place they built. Every room they checked was real.
+  # The fluorescents return. The clipboard has every door marked.
+  # The building hums at a different pitch — warmer. Present. Owned.
+
+  - time: "8:00"
+    action: fade_in
+    sound_ids: [fluorescent_restore]
+    fade_in_seconds: 2
+    condition: "game_state.ending_id == 'integration'"
+    description: >
+      Integration ending: fluorescent buzz returns at 0.22 volume over 2 seconds.
+      The same buzz as Phase 1 but slightly louder — the player notices it now.
+      The building is lit. The hallway visible. The room is a hospital room.
+      The player signed the chart. The attending physician line has their name.
+      The building accepted this. The fluorescents confirm it.
+
+  - time: "8:30"
+    action: fade_in
+    sound_ids: [ventilation]
+    fade_in_seconds: 4
+    condition: "game_state.ending_id == 'integration'"
+    description: >
+      Integration ending: ventilation returns over 4 seconds. The breathing
+      pattern is back — but it is the mechanical version, the Phase 1 version.
+      Not the ambiguous Phase 3 version. The building is a building again.
+      The ventilation is ductwork. The air is warm. The hospital is functioning
+      as designed. It was always functioning as designed. The player's design.
+
+  # --- CONSUMPTION ENDING ---
+  # The loop. The player wakes up in the bed. Morning. They are the patient.
+  # Hospital daytime sounds replace the midnight silence.
+  # The shift starts in 12 hours. The chart is on the bedside table.
+
+  - time: "8:00"
+    action: fade_in
+    sound_ids: [morning_light]
+    fade_in_seconds: 3
+    condition: "game_state.ending_id == 'consumption'"
+    description: >
+      Consumption ending: hospital morning ambient fades in over 3 seconds.
+      Distant voices. Laundry cart. PA chime. The player wakes up. They are
+      in Room 4B. They are in the bed. The morning light is warm through the
+      blinds. The chart is on the bedside table. It has their name.
+      The admission reason reads: "Recurring episodes. Believes they are
+      a security guard." The morning sounds are aggressively normal.
+      Normal is the prison. The shift starts in 12 hours.
+
+  - time: "9:00"
+    action: fade_in
+    sound_ids: [fluorescent_restore]
+    fade_in_seconds: 1
+    condition: "game_state.ending_id == 'consumption'"
+    description: >
+      Consumption ending: fluorescents snap on — quick 1-second fade.
+      Morning lights in a hospital room. The buzz is the same as Phase 1.
+      The loop is complete. The sound is the same. The context is inverted.
+
+  # --- RELEASE ENDING ---
+  # The hospital lets the player go. The front doors are unlocked.
+  # Cold air. Dawn light. The building behind them is dark and still.
+  # A brief return of all sounds (the building exhaling), then silence.
+
+  - time: "8:00"
+    action: restore_all_channels
+    sound_ids: [fluorescent_buzz, ventilation, distant_elevator]
+    restore_volumes:
+      fluorescent_buzz: 0.10
+      ventilation: 0.06
+      distant_elevator: 0.04
+    fade_in_seconds: 2
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: all removed sounds return at HALF their original volume
+      over 2 seconds. The building exhales. It is letting the player go.
+      The sounds are quieter because the player is moving away from them —
+      toward the front doors, toward outside. The building is behind them now.
+      Its sounds are retreating.
+
+  - time: "9:00"
+    action: fade_all_to_nothing
+    fade_duration_seconds: 15
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: all hospital sounds fade to nothing over 15 seconds.
+      The player is outside. The building's sounds cannot follow them past
+      the threshold. 15 seconds is long enough to feel the transition from
+      inside to outside — from building to air. The silence that follows
+      is not the horror silence of Phase 4. It is the silence of dawn.
+      A parking lot at 6 AM. A building that is just a building.
+
+  - time: "9:15"
+    action: fade_in
+    sound_ids: [morning_light]
+    fade_in_seconds: 8
+    condition: "game_state.ending_id == 'release'"
+    description: >
+      Release ending: morning ambient enters at 0.2 volume (lower than
+      consumption's 0.35) — this is OUTSIDE morning, not inside. Distant
+      traffic. A bird. The parking lot. The cold air that has no ceiling.
+      The morning is not warm here. It is real. Real is cold at 6 AM.
+      The player is free. Freedom does not sound like comfort.
+      It sounds like distance.
+
+  # --- DISSOLUTION ENDING ---
+  # The hallways keep going. All sounds return and HOLD.
+  # No fade. No ending. The building continues.
+  # The player is still walking.
+
+  - time: "8:00"
+    action: restore_all_channels
+    sound_ids: [fluorescent_buzz, footsteps_echo, ventilation, distant_elevator]
+    restore_volumes:
+      fluorescent_buzz: 0.18
+      footsteps_echo: 0.22
+      ventilation: 0.12
+      distant_elevator: 0.08
+    fade_in_seconds: 2
+    condition: "game_state.ending_id == 'dissolution'"
+    description: >
+      Dissolution ending: ALL original ambient sounds return simultaneously
+      over 2 seconds at their FULL Phase 1 volumes. The building is alive.
+      It was always alive. The silence was a corridor. The player walked
+      through it and came out the other side and the building is still here.
+      The footsteps echo. The fluorescents buzz. The elevator moves in the
+      distance. The ventilation breathes. Nothing has changed. Nothing stopped.
+      The player was always walking.
+
+  - time: "8:30"
+    action: fade_in
+    sound_ids: [hospital_drone]
+    fade_in_seconds: 6
+    condition: "game_state.ending_id == 'dissolution'"
+    description: >
+      Dissolution ending: the building drone returns over 6 seconds.
+      This is the building's attention again — but now it is not directed
+      at the player. It is the building's resting state. The player is not
+      special. They are not the only guard who checked Room 4B. They are not
+      the last. The building will be here when they leave. If they leave.
+      The drone does not fade. It holds. The experience ends with the
+      building at full volume. The player is inside it. The sounds continue.
+
+  # ---------------------------------------------------------------------------
+  # MIXING AND CROSSFADE PARAMETERS
+  # Runtime audio graph parameters applied continuously throughout the game.
+  # ---------------------------------------------------------------------------
+
+mixing:
+  tts_ducking:
+    # When the narrator speaks via TTS, ambient volume reduces by 8dB.
+    # More aggressive than The Last Session because hospital ambient has
+    # more broadband content that competes with voice intelligibility.
+    ambient_reduction_db: -8
+    fade_in_duration_ms: 200    # Fast duck — narrator is clinical, not conversational
+    fade_out_duration_ms: 500   # Ambient returns after narrator stops
+    implementation: >
+      On TTS start event: call fadeVolume(ambientGain, currentVolume * 0.4, 0.2)
+      On TTS end event: call fadeVolume(ambientGain, targetVolume, 0.5)
+      Using linearRampToValueAtTime as per sound-design-pipeline-research.md.
+
+  crossfade_default_ms: 1500
+  # Faster default than The Last Session (2000ms) — the institutional setting
+  # is sharper, less organic. Transitions between floors should feel like
+  # crossing thresholds, not drifting between spaces.
+
+  spatial:
+    # Panning values: -1.0 (full left) to +1.0 (full right)
+    # The hospital is spatially grounded: the player walks center-corridor.
+    # Sounds come from walls (left/right), ceiling (fluorescents), and
+    # ahead/behind (elevator, rooms). This gives the stereo field a
+    # consistent institutional geography.
+    fluorescent_buzz:
+      pan: 0.0
+      notes: "Overhead. Omnidirectional. In stereo, slight left-right variation per floor."
+    footsteps_echo:
+      pan: 0.0
+      notes: "Centered. The player's own spatial anchor. Echo reverb changes per floor."
+    ventilation:
+      pan: 0.0
+      notes: "Ductwork. Omnidirectional. Breathing pattern is the psychological hook."
+    distant_elevator:
+      pan: 0.15
+      notes: "East wing. Slightly right. Becomes centered when elevator arrives at player's floor."
+    hospital_drone:
+      pan: 0.0
+      notes: "The building. No source. Everywhere."
+    sub_bass:
+      pan: 0.0
+      notes: "Omnidirectional. 15-25Hz. Felt, not heard."
+    heartbeat:
+      pan: 0.0
+      notes: "Initially centered. Shifts toward +0.1 (right, toward bed) as player approaches."
+
+  # Implementation reference (from sound-design-pipeline-research.md):
+  # All fades use linearRampToValueAtTime for smooth gain transitions.
+  # Hard stops use immediate gain.value assignment (or +0.001s if required).
+  # All assets pre-loaded during visual onboarding screen via fetch + decodeAudioData.
+  # audioCtx.resume() must be called after first user gesture (browser requirement).

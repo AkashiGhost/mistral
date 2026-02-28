@@ -1,0 +1,661 @@
+# =============================================================================
+# cue-map.yaml — The Lighthouse
+# Sound asset registry: every audio cue used in the game.
+#
+# STRUCTURE:
+#   ambient      — looping background sounds managed by the ambient engine
+#   intermittent — non-looping sounds played on a timer with variance
+#   reactive     — LLM-triggered sounds embedded via [SOUND:x] markers
+#   transitions  — one-shot stop/fade events for ambient removal sequence
+#   atmospheric  — drones added as tension builds in Phase 4+
+#   endings      — sounds used exclusively in Phase 5 resolution variants
+#
+# DESIGN PRINCIPLE:
+#   Subtractive horror — the storm DISAPPEARS. The world goes quiet around you.
+#   The lighthouse begins as a functioning shelter in a hostile storm. The horror
+#   is not the storm getting louder (it does, in Phase 2) but the storm going
+#   SILENT in Phase 3. Loud is nature. Quiet is wrong. By the time the voice
+#   says "There is no ship," the player has already lost every sound that made
+#   the world comprehensible. Only the voice remains. That was always the point.
+#
+# SOUND ID ALIGNMENT:
+#   All sound_ids in this file map 1:1 to references in arc.yaml sound_state
+#   fields, sound_cues, phase-overrides.yaml [SOUND:x] tags, and
+#   ending_conditions. If a sound_id appears in arc.yaml, it MUST appear here.
+#
+# ASSET GENERATION:
+#   - Ambient loops -> ElevenLabs SFX (30s, native loop toggle)
+#   - Drones/sustained tones -> Stable Audio 2.5 via fal.ai (up to 3 min)
+#   - Quick SFX prototyping -> CassetteAI via fal.ai (~1s generation)
+#   - All paths are relative to the game assets root
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# AMBIENT — Loop-based background sounds present at game start.
+# These establish the lighthouse as shelter against the storm.
+# The pipeline starts all of these at game init (time 0:00).
+#
+# Arc.yaml Phase 1 sound_state.active:
+#   [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery, foghorn]
+# All five must be defined here.
+# ---------------------------------------------------------------------------
+
+ambient:
+
+  storm_wind:
+    name: "Storm wind howling against lighthouse"
+    description: >
+      Violent, gusting coastal wind slamming against the stone lighthouse walls.
+      Not steady — it surges and drops, with gusts that shake the structure and
+      find gaps in the masonry to sing through. Deep bass rumble from pressure
+      differentials, high-end shriek from wind through cracks. This is the
+      dominant sound of the experience: the storm is the world.
+      Volume trajectory: 0.5 (Phase 1) -> 0.7 (Phase 2, storm intensifying) ->
+      0.3 (Phase 3, storm DROPS) -> 0.15 (Phase 3 end) -> 0.0 (Phase 4 mute).
+      The Phase 3 drop is NOT a fade — it is a discontinuity. Storms do not do
+      this. That wrongness is the audio signal that reality is bending.
+    asset_path: "assets/audio/storm-wind-lighthouse.mp3"
+    generation_prompt: "Violent coastal storm wind against stone lighthouse, severe gale, howling gusts, bass rumble, high-pitched shriek through masonry gaps, relentless, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.5
+    loop: true
+    spatial:
+      pan: 0.0     # Omnidirectional — the storm surrounds the structure
+    fade_in_seconds: 0   # Present immediately from first frame
+    fade_out_seconds: 0  # Managed by timeline volume adjustments and storm_drop
+    persists_through: "Phases 1-3. Volume varies per timeline. Gone by Phase 4 mute."
+    tag: null  # Not LLM-triggered — timeline-managed
+
+  waves_crash:
+    name: "Ocean waves crashing on rocks"
+    description: >
+      Heavy sea breaking on the rock foundation below the lighthouse. Rhythmic
+      but irregular — each wave is different, some explosive (spray against stone),
+      some rolling (water pulling back over gravel). The rhythm gives the player
+      a temporal anchor: while waves crash with regularity, time is passing.
+      When waves go erratic then quiet in Phase 3, the temporal anchor dissolves.
+      Volume trajectory: 0.5 (Phase 1) -> 0.65 (Phase 2) -> 0.4 (Phase 3) ->
+      0.2 (Phase 3 storm_drop) -> 0.0 (Phase 4 mute).
+    asset_path: "assets/audio/waves-crash-rocks.mp3"
+    generation_prompt: "Heavy ocean waves crashing on rocks, violent surf, spray impact, gravel undertow, coastal storm, rhythmic but irregular, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.5
+    loop: true
+    spatial:
+      pan: -0.2    # Slightly left — the sea-facing side of the lighthouse
+    fade_in_seconds: 0
+    fade_out_seconds: 0.5  # Phase 4 mute_all — quick cut
+    persists_through: "Phases 1-3. Volume varies. Removed at Phase 4 silence."
+    tag: null
+
+  radio_static_ambient:
+    name: "Radio static — constant low hiss"
+    description: >
+      Persistent low-level VHF radio static/hiss. The sound of an open marine
+      radio channel — white noise with occasional micro-crackles and ghost
+      signals that almost form patterns. This is the medium through which the
+      voice reaches the keeper. The static has a warm, almost musical quality
+      shaped by old circuitry.
+      The voice talks OVER this static in Phases 1-2. In Phase 3, the static
+      gradually clears (volume drops) as the voice becomes clearer. In Phase 4,
+      the static is GONE — the voice sounds like it is in the room, not on a
+      radio. The absence of static is the first audio revelation: the radio
+      was never the medium.
+    asset_path: "assets/audio/radio-static-maritime.mp3"
+    generation_prompt: "Old maritime VHF radio static hiss, constant low noise, occasional micro-crackle, warm analog quality, ghost signal patterns, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.2
+    loop: true
+    spatial:
+      pan: 0.1     # Slightly right — the radio is on the desk
+    fade_in_seconds: 0
+    fade_out_seconds: 3  # Phase 3 gradual clear, Phase 4 gone
+    persists_through: "Phases 1-3. Clears gradually in Phase 3. Gone by Phase 4."
+    tag: null
+
+  lighthouse_machinery:
+    name: "Lighthouse lamp rotation mechanism"
+    description: >
+      The grinding, rhythmic mechanical sound of the lighthouse lamp mechanism
+      turning. Heavy gears, a low groan on each rotation, a slight metallic
+      squeak at the apex. This is the lighthouse's heartbeat — the keeper has
+      lived with this sound so long it has become part of the silence. They will
+      not consciously notice it until it stops.
+      The machinery stops at 5:00 (Phase 3) with a shudder and a HARD STOP.
+      Not a fade — the mechanism seizes. The silence afterward is the first
+      moment the lighthouse feels dead rather than alive. The beam still turns
+      (it has enough momentum) but the sound is gone.
+    asset_path: "assets/audio/lighthouse-machinery-grind.mp3"
+    generation_prompt: "Lighthouse lamp mechanism, heavy rotating gears, rhythmic grinding, metallic squeak at apex, old machinery heartbeat, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.2
+    loop: true
+    spatial:
+      pan: 0.0
+      vertical: 0.7  # Above — the lamp room is at the top of the 87 steps
+    fade_in_seconds: 0
+    fade_out_seconds: 0  # HARD STOP at 5:00 — machinery seizes, no fade
+    removes_at: "Phase 3 / 5:00 — HARD STOP, no fade"
+    design_note: >
+      The zero fade_out is deliberate. The machinery does not wind down.
+      It stops. The mechanism seizes. The silence is immediate and structural.
+      Implement as instant gain.value = 0, NOT a ramp.
+    tag: null
+
+  foghorn:
+    name: "Foghorn — automated"
+    description: >
+      Deep, resonant foghorn blast. Automated — fires every ~90 seconds with
+      +/-10s variance. Two-tone: a lower fundamental (~120 Hz) and an upper
+      harmonic (~240 Hz) that gives it the classic foghorn "chord." Each blast
+      is 3-4 seconds long. Felt in the chest as much as heard.
+      This is the lighthouse doing its job — warning ships away from the rocks.
+      Its removal at 5:30 (Phase 3) is the moment the lighthouse stops
+      functioning as a safety device. The keeper is no longer in a working
+      lighthouse. They are in a building on a rock.
+    asset_path: "assets/audio/foghorn-deep-blast.mp3"
+    generation_prompt: "Deep foghorn blast, two-tone 120Hz fundamental with 240Hz harmonic, resonant coastal warning signal, 3-4 seconds duration, felt in chest, reverberant"
+    generation_tool: elevenlabs_sfx
+    volume: 0.35
+    loop: false
+    spatial:
+      pan: 0.0
+      vertical: 0.5  # Above and out — mounted on the lighthouse exterior
+    playback_interval_seconds: 90
+    playback_interval_variance_seconds: 10
+    fade_in_seconds: 0.5
+    fade_out_seconds: 4  # Phase 3 removal — foghorn loses power mid-blast
+    removes_at: "Phase 3 / 5:30"
+    tag: null
+
+# ---------------------------------------------------------------------------
+# INTERMITTENT — Non-looping sounds played at irregular intervals.
+# These simulate the lighthouse as a functioning structure under stress.
+# Their disappearance signals the structure failing or the world changing.
+# ---------------------------------------------------------------------------
+
+intermittent:
+
+  metal_creaking:
+    name: "Metal lighthouse structure creaking"
+    description: >
+      The metal catwalk, railing, and lamp housing creaking under wind load.
+      A long, low metallic groan lasting 2-3 seconds — the sound of stress
+      on old iron. Played every ~40 seconds with +/-15s variance. In Phase 1,
+      this is normal structural stress. After the storm drops in Phase 3, the
+      creaking continues in the silence — which is wrong, because the wind
+      that caused it is gone.
+    asset_path: "assets/audio/metal-creaking-lighthouse.mp3"
+    generation_prompt: "Metal lighthouse structure creaking in wind, iron railing and catwalk stress, low metallic groan 2-3 seconds, coastal structure under load"
+    generation_tool: elevenlabs_sfx
+    volume: 0.2
+    loop: false
+    spatial:
+      pan: 0.0
+      vertical: 0.3   # Above — the metal structure is in the upper levels
+    playback_interval_seconds: 40
+    playback_interval_variance_seconds: 15
+    fade_in_seconds: 0
+    fade_out_seconds: 0.5
+    removes_at: "Phase 4 / 6:00 — mute_all removes everything"
+    tag: null
+
+  thunder_distant:
+    name: "Distant thunder"
+    description: >
+      Low rumbling distant thunder rolling across the ocean. 3-5 seconds of
+      bass-heavy rumble, no sharp crack. The thunder is far enough away to be
+      atmospheric rather than startling. Used in Phases 1-2 to establish the
+      storm's scale. The thunder never comes closer in the normal timeline.
+    asset_path: "assets/audio/thunder-distant-ocean.mp3"
+    generation_prompt: "Low rumbling distant thunder over ocean, deep rolling bass, no sharp crack, coastal storm atmosphere, 3-5 seconds"
+    generation_tool: elevenlabs_sfx
+    volume: 0.3
+    loop: false
+    spatial:
+      pan: -0.3    # Left — seaward side
+    playback_interval_seconds: 60
+    playback_interval_variance_seconds: 30
+    fade_in_seconds: 0
+    fade_out_seconds: 2
+    removes_at: "Phase 3 / ~5:45 — stops with storm drop"
+    tag: null
+
+# ---------------------------------------------------------------------------
+# REACTIVE — LLM-triggered sounds embedded via [SOUND:x] markers.
+# The LLM places these in its response text. The engine parses, strips,
+# and fires the audio at the corresponding point in the TTS stream.
+#
+# Referenced in: system.yaml sound_marker_format, phase-overrides.yaml
+# per-phase AVAILABLE REACTIVE SOUND CUES sections.
+# ---------------------------------------------------------------------------
+
+reactive:
+
+  radio_static:
+    name: "Radio static burst — short"
+    description: >
+      A short burst of loud radio static (0.5-1s). Used when the voice wants
+      static to interrupt its own words — a transmission break, a moment where
+      the signal drops and returns. The LLM embeds [SOUND:radio_static] in its
+      response at the exact point where the interruption should occur.
+      Primary reactive cue in Phases 1-3. Becomes less frequent in Phase 3
+      as the voice clears. NEVER used in Phase 4-5 (static is gone — the voice
+      is clear, which IS the horror).
+    asset_path: "assets/audio/radio-static-burst.mp3"
+    generation_prompt: "Short radio static burst, VHF marine radio, transmission break, 0.5-1 second, sharp onset, quick decay"
+    generation_tool: cassette_ai
+    volume: 0.5
+    loop: false
+    spatial:
+      pan: 0.1     # Same position as radio
+    tag: "[SOUND:radio_static]"
+
+  radio_burst:
+    name: "Radio static burst — loud"
+    description: >
+      A louder, longer burst of radio static (1-2s). Used sparingly for emphasis
+      — the first transmission, a critical moment of signal loss. The LLM embeds
+      [SOUND:radio_burst] for dramatic radio events. Used at session open when
+      the radio first crackles to life with the distress call.
+      Referenced in arc.yaml beat contact_opening as a sound_cue with trigger: beat_start.
+    asset_path: "assets/audio/radio-burst-loud.mp3"
+    generation_prompt: "Loud radio static burst, VHF marine radio, sudden signal activation, 1-2 seconds, harsh onset, emergency frequency crackle"
+    generation_tool: cassette_ai
+    volume: 0.7
+    loop: false
+    spatial:
+      pan: 0.1
+    tag: "[SOUND:radio_burst]"
+
+  waves_close:
+    name: "Wave surge — close impact"
+    description: >
+      A single heavy wave impact close to the lighthouse — louder and more
+      violent than the ambient waves_crash loop. Used when the voice references
+      the sea getting rougher or during moments of escalation. The LLM embeds
+      [SOUND:waves_close] when narrating the sea rising or a wave hitting the rocks.
+      Referenced in arc.yaml beat first_impossibility as a sound_cue.
+    asset_path: "assets/audio/wave-surge-close.mp3"
+    generation_prompt: "Single heavy wave crashing on rocks close-up, violent surf impact, spray, deep bass impact, coastal storm"
+    generation_tool: elevenlabs_sfx
+    volume: 0.65
+    loop: false
+    spatial:
+      pan: -0.3    # Left — the sea
+    tag: "[SOUND:waves_close]"
+
+# ---------------------------------------------------------------------------
+# TRANSITIONS — One-shot events that control the removal of ambient sounds.
+# These are referenced by the timeline but defined here for asset registry.
+# They are gain automation events on existing channels, not independent sounds.
+#
+# REMOVAL SEQUENCE (from arc.yaml Phase 3 sound_state):
+#   5:00 -> machinery HARD STOP (lighthouse heartbeat stops)
+#   5:30 -> foghorn stops (lighthouse stops being a navigation aid)
+#   5:45 -> storm DROPS (wind and waves pull back unnaturally)
+#   6:00 -> mute ALL (absolute silence before revelation)
+# ---------------------------------------------------------------------------
+
+transitions:
+
+  machinery_stop:
+    name: "Lighthouse machinery hard stop"
+    description: >
+      The lighthouse lamp mechanism seizes and stops. Not a fade — an instant
+      stop with a brief mechanical shudder (the last gear catching). The grinding
+      that has been the lighthouse's heartbeat since 0:00 is gone. The silence
+      is structural — the lighthouse feels different without its heartbeat.
+      The beam still turns on momentum but the sound is dead.
+      Implemented as instant gain.value = 0 on the lighthouse_machinery channel,
+      preceded by a brief shudder SFX (0.3s).
+    asset_path: "assets/audio/machinery-shudder-stop.mp3"
+    generation_prompt: "Heavy machinery sudden stop, gear seize, mechanical shudder, final metallic clank, then silence, lighthouse mechanism"
+    generation_tool: cassette_ai
+    volume: 0.4
+    loop: false
+    fade_duration_seconds: 0  # INSTANT — machinery seizes
+    trigger_type: instant_stop_with_sfx
+    target_channel: lighthouse_machinery
+    triggered_at: "5:00"
+    design_note: >
+      Use audioCtx.currentTime + 0.001 if the engine requires a non-zero time.
+      NEVER use 0.1s or longer. The machinery does not wind down. It stops.
+    tag: "[SOUND:machinery_stop]"
+
+  foghorn_stop:
+    name: "Foghorn silence transition"
+    description: >
+      The foghorn fires its last blast, then nothing. The automation system has
+      stopped. The intermittent scheduler stops triggering the foghorn. The player
+      will wait for the next blast. 40 seconds pass. 60 seconds. It never comes.
+      The waiting is the horror. Implemented as stopping the foghorn intermittent
+      timer — not a gain event but a scheduling event.
+    asset_path: null   # Scheduling event — stops the foghorn timer
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 0
+    trigger_type: stop_intermittent
+    target_channel: foghorn
+    triggered_at: "5:30"
+    design_note: >
+      The foghorn does not fade mid-blast. It simply never fires again.
+      The silence where the next blast should be is the horror event.
+    tag: "[SOUND:foghorn_stop]"
+
+  storm_drop:
+    name: "Storm drop — unnatural silence"
+    description: >
+      The storm DROPS. Not fades — drops. Wind dies from peak fury to near-silence
+      in 3 seconds. Waves pull back to a low muted pulse. This is NOT how storms
+      work. Real storms taper over hours. This one stops like someone turned off
+      a speaker. The 3-second duration is fast enough to feel discontinuous but
+      slow enough to avoid an audio pop.
+      After the drop: the silence is enormous. The radio static (already thinning)
+      is suddenly the loudest thing. The voice and the keeper are alone in a way
+      that feels structurally different from Phase 1 isolation.
+    asset_path: null   # Gain automation on multiple channels
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 3
+    trigger_type: gain_automation_multi
+    target_channels:
+      storm_wind: 0.15     # Wind to near-silence
+      waves_crash: 0.2     # Waves to a low pulse, not gone entirely
+    triggered_at: "5:45"
+    design_note: >
+      The 3-second drop must feel WRONG. Real storms do not do this. The
+      player should have a visceral "that's not right" reaction. The waves
+      don't go fully silent — a low rhythmic pulse remains, like the sea
+      holding its breath.
+    tag: "[SOUND:storm_drop]"
+
+  silence_absolute:
+    name: "Absolute silence — pre-revelation"
+    description: >
+      ALL active sounds muted simultaneously over 0.5 seconds before the
+      revelation beat. Applies to whatever is still running at 6:00:
+      storm_wind (at 0.15), waves_crash (at 0.2), radio_static_ambient
+      (thinning), metal_creaking, and any remaining elements. The 0.5s
+      prevents an audio click/pop from the gain discontinuity while still
+      feeling sudden.
+      The 2 seconds that follow (6:00 to 6:02) are ABSOLUTE silence.
+      No wind. No waves. No static. No machinery. No foghorn. Nothing.
+      This is the loudest silence in the game because the player has been
+      conditioned to expect storm sounds as a constant since second 0.
+      Two seconds of nothing before the revelation.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 0.5
+    trigger_type: mute_all
+    triggered_at: "6:00"
+    tag: "[SOUND:silence_absolute]"
+
+# ---------------------------------------------------------------------------
+# ATMOSPHERIC — Drones and tones ADDED during Phase 4 revelation.
+# These enter from the 2 seconds of absolute silence — the first new sounds
+# the player hears after the storm has been taken away entirely.
+# ---------------------------------------------------------------------------
+
+atmospheric:
+
+  deep_ocean_drone:
+    name: "Deep ocean drone"
+    description: >
+      A vast, low, sourceless drone — the sound of deep ocean. Not a musical
+      tone but something organic and enormous: the acoustic signature of a body
+      of water that is miles deep. Somewhere between a sustained bass note and
+      the resonance of a cathedral. This enters after 2 seconds of absolute
+      silence at 6:02 — the first sound of the revelation phase. It represents
+      the truth emerging: whatever the voice is, it is connected to something
+      vast and patient and oceanic. The drone does not modulate. It does not
+      swell. It is simply there.
+      Also used in the dissolution ending sound_signature.
+    asset_path: "assets/audio/deep-ocean-drone.mp3"
+    generation_prompt: "Deep ocean drone, vast low frequency 40-60Hz, sourceless, organic resonance, cathedral reverb, cosmic ocean depth, psychological horror, 120 seconds"
+    generation_tool: stable_audio_2
+    volume: 0.35
+    loop: true
+    spatial:
+      pan: 0.0     # Sourceless — the ocean has no source. It is everywhere.
+    fade_in_seconds: 4
+    introduced_at: "Phase 4 / 6:02"
+    tag: "[SOUND:deep_ocean_drone]"
+
+  sub_bass:
+    name: "Sub-bass ocean pressure"
+    description: >
+      20-30 Hz infrasound rumble. At this volume (0.1) it is felt more than heard,
+      creating a physical sense of unease without an identifiable source. Research
+      shows infrasound at this frequency range can induce anxiety, unease, and the
+      sensation of being underwater or deep below the surface. Enters with the
+      deep ocean drone at 6:02.
+      Also used in the dissolution ending sound_signature.
+    asset_path: "assets/audio/sub-bass-ocean-pressure.mp3"
+    generation_prompt: "Deep sub-bass ocean pressure 20-30Hz, infrasound, deep water feeling, ominous, barely audible, seamless loop"
+    generation_tool: stable_audio_2
+    volume: 0.1
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 4
+    introduced_at: "Phase 4 / 6:02"
+    design_note: "Volume intentionally near-inaudible. Raising it defeats the purpose."
+    tag: "[SOUND:sub_bass]"
+
+# ---------------------------------------------------------------------------
+# ENDINGS — Sounds used exclusively in Phase 5 (8:00-10:00).
+# Each ending variant receives a unique sound signature.
+#
+# FOUR ENDINGS (from arc.yaml ending_conditions):
+#   acceptance   — Keeper stays connected. Storm resolves warm. Gentle waves.
+#   loop         — Keeper hangs up. Cold storm returns. Radio restarts. Same call.
+#   release      — Keeper releases the voice. Static fades. Morning comes.
+#   dissolution  — Keeper questions reality. All sounds return, then fade to nothing.
+#
+# Sound design principle: each ending's audio must be emotionally conclusive
+# without being literal. The storm's character is the primary differentiator.
+# ---------------------------------------------------------------------------
+
+endings:
+
+  storm_warm:
+    name: "Storm — warm resolution"
+    description: >
+      The storm breaks. Not stops — breaks. The violence eases into steady rain,
+      the wind drops to something that sounds like breathing instead of screaming.
+      EQ-shifted toward the midrange (200-800 Hz boosted, highs rolled off at 6kHz).
+      The effect is unmistakable: the storm sounds warmer, less hostile, more like
+      weather than wrath. Used for the acceptance ending where the keeper stays
+      connected. The world outside is still a storm, but it has become bearable.
+      The keeper chose to stay. The world responded.
+    asset_path: "assets/audio/storm-warm-resolve.mp3"
+    generation_prompt: "Storm breaking into steady rain, wind calming to gentle gusts, warm atmospheric tone, midrange heavy, coastal, resolved, bittersweet, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.45
+    loop: true
+    spatial:
+      pan: 0.0
+    used_in_endings: [acceptance]
+    tag: "[SOUND:storm_warm]"
+
+  storm_cold:
+    name: "Storm — cold return"
+    description: >
+      The storm returns. Full fury. Exactly as it was at session start — same
+      volume, same violence, same shrieking wind. EQ shifted cold: highs boosted
+      3dB at 8kHz+, mids scooped. The storm sounds harder, more percussive,
+      indifferent. Used for the loop ending where the keeper hangs up and the
+      call restarts. The storm was always here. It never left. The calm was
+      the anomaly, not the storm.
+    asset_path: "assets/audio/storm-cold-return.mp3"
+    generation_prompt: "Violent coastal storm returning, full fury, harsh wind, bright high-end, percussive rain, cold indifferent atmosphere, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.6
+    loop: true
+    spatial:
+      pan: 0.0
+    used_in_endings: [loop]
+    tag: "[SOUND:storm_cold]"
+
+  waves_gentle:
+    name: "Waves — gentle"
+    description: >
+      Gentle waves on rock. The same sea, but calm. The violence is gone. The
+      rhythm is slow, patient, almost meditative. This is the sea after the storm
+      — or the sea that was always beneath the storm. Used in acceptance and
+      release endings. The contrast with the Phase 1 violence is the entire
+      emotional argument: the same water can destroy and soothe.
+    asset_path: "assets/audio/waves-gentle-rock.mp3"
+    generation_prompt: "Gentle waves on rocky shore, calm sea, slow rhythm, meditative, post-storm, peaceful coastal ambient, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.35
+    loop: true
+    spatial:
+      pan: -0.2    # Same position as main waves
+    used_in_endings: [acceptance, release]
+    tag: null
+
+  radio_loop:
+    name: "Radio transmission restart"
+    description: >
+      The radio crackles back to life. Same static. Same burst. Then the same
+      voice, the same words: "Mayday, mayday, this is the Meridian. Can anyone
+      hear me?" The transmission has restarted. The call has always been happening.
+      This is a single playback of the opening radio burst — the TTS engine
+      delivers the voice's opening line over it, completing the loop.
+      Used exclusively in the loop ending. The symmetry with the opening is
+      the horror: everything the keeper just experienced will happen again.
+    asset_path: "assets/audio/radio-loop-restart.mp3"
+    generation_prompt: "Radio crackling to life, VHF marine static burst, emergency frequency activating, transmission beginning, ominous loop restart"
+    generation_tool: cassette_ai
+    volume: 0.6
+    loop: false
+    spatial:
+      pan: 0.1     # Radio position
+    used_in_endings: [loop]
+    tag: "[SOUND:radio_loop]"
+
+  morning_calm:
+    name: "Morning calm — dawn ambience"
+    description: >
+      The morning after. Spare, quiet. One or two seabirds in the distance.
+      Gentle waves (barely audible). The faintest suggestion of wind, warm now,
+      not hostile. No storm. No static. No machinery. Just the island in early
+      morning light. This is the only sound in the entire experience that
+      represents "after" — a world that exists beyond the storm, beyond the
+      voice, beyond the night. The seabirds don't know what happened in this
+      lighthouse. They are simply alive.
+    asset_path: "assets/audio/morning-calm-dawn.mp3"
+    generation_prompt: "Dawn coastal ambience, distant seabirds, gentle waves barely audible, light warm wind, post-storm morning, peaceful, sparse, natural"
+    generation_tool: elevenlabs_sfx
+    volume: 0.3
+    loop: false
+    spatial:
+      pan: -0.2    # Through the window — seaward
+    used_in_endings: [release]
+    tag: "[SOUND:morning_calm]"
+
+  all_sounds_return:
+    name: "All original ambient sounds simultaneous return"
+    description: >
+      In the dissolution ending at 8:00, every ambient sound that was removed
+      during Phases 2-4 returns SIMULTANEOUSLY: storm_wind, waves_crash,
+      radio_static_ambient, lighthouse_machinery, foghorn — all at once, at or
+      above their original volumes. After 6+ minutes of progressive silence and
+      2 seconds of absolute nothing, this is overwhelming. Not violent — just
+      full. The lighthouse is completely alive again. The storm is back. The
+      machinery is running. The foghorn sounds. The radio crackles.
+      The horror: it was always like this. The silence was real and the
+      restoration is real. Neither proves anything except that neither state
+      was ever stable.
+      Then at 9:00, everything fades to absolute nothing over 15 seconds.
+    asset_path: null  # Orchestrated event — re-activates existing channels
+    volume: null      # Each channel returns to its baseline volume
+    loop: false
+    trigger_type: restore_all_channels
+    target_channels: [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery, foghorn]
+    restore_volumes:
+      storm_wind: 0.55
+      waves_crash: 0.5
+      radio_static_ambient: 0.2
+      lighthouse_machinery: 0.2
+      foghorn: 0.35
+    fade_in_seconds: 2  # Fast enough to feel like a restoration, not a gradual build
+    used_in_endings: [dissolution]
+    tag: null
+
+# ---------------------------------------------------------------------------
+# MIXING — Web Audio API routing and ducking configuration.
+# These are not sound assets but runtime audio graph parameters.
+# ---------------------------------------------------------------------------
+
+mixing:
+  # TTS ducking: when the voice speaks, reduce ambient volume so narration is clear.
+  # -7dB is slightly more aggressive than The Last Session (-6dB) because the storm
+  # ambient is louder and more complex. Narration must be intelligible over
+  # howling wind and crashing waves.
+  tts_ducking:
+    ambient_reduction_db: -7
+    fade_in_duration_ms: 250   # Ambient fades down when TTS starts — faster than Last Session
+    fade_out_duration_ms: 550  # Ambient returns more slowly after TTS ends
+    design_note: >
+      The storm should remain present even during narration to maintain the
+      sense of being besieged. But narration must be intelligible. The faster
+      fade-in (250ms vs 300ms) is needed because the storm has more transient
+      energy (wave impacts, wind gusts) that can mask initial consonants.
+      In Phase 4-5 where the voice has no static, the duck should be gentler
+      (ambient_reduction_db: -4) to keep the ocean drone palpable.
+
+  # Default crossfade for all other transitions not explicitly specified
+  crossfade_default_ms: 2000
+
+  # Spatial positioning summary (for Web Audio API PannerNode configuration)
+  # All panning values are -1.0 (full left) to +1.0 (full right)
+  spatial_map:
+    storm_wind:
+      pan: 0.0
+      notes: "Omnidirectional. The storm surrounds the lighthouse."
+    waves_crash:
+      pan: -0.2
+      notes: "Slightly left. The sea-facing side of the lighthouse."
+    radio_static_ambient:
+      pan: 0.1
+      notes: "Slightly right. The radio is on the desk."
+    lighthouse_machinery:
+      pan: 0.0
+      vertical: 0.7
+      notes: "Above. The lamp room at the top of the 87 steps."
+    foghorn:
+      pan: 0.0
+      vertical: 0.5
+      notes: "Above and out. Mounted high on the lighthouse exterior."
+    deep_ocean_drone:
+      pan: 0.0
+      notes: "Sourceless. The ocean has no source — it is everywhere."
+    sub_bass:
+      pan: 0.0
+      notes: "Omnidirectional by physics at 20-30Hz. No meaningful spatial position."
+
+  # Preload priority: load these during visual onboarding screen, before game starts.
+  # Order is priority (first = most critical to have ready).
+  preload_order:
+    - assets/audio/storm-wind-lighthouse.mp3          # Needed at second 0
+    - assets/audio/waves-crash-rocks.mp3              # Needed at second 0
+    - assets/audio/radio-static-maritime.mp3          # Needed at second 0
+    - assets/audio/lighthouse-machinery-grind.mp3     # Needed at second 0
+    - assets/audio/foghorn-deep-blast.mp3             # Needed at second 0
+    - assets/audio/radio-static-burst.mp3             # Needed at second 0 (reactive)
+    - assets/audio/radio-burst-loud.mp3               # Needed at second 0 (first contact)
+    - assets/audio/metal-creaking-lighthouse.mp3      # Needed at second 15
+    - assets/audio/thunder-distant-ocean.mp3          # Needed at second 30
+    - assets/audio/wave-surge-close.mp3               # Needed by minute 2
+    - assets/audio/machinery-shudder-stop.mp3         # Needed by minute 5
+    - assets/audio/deep-ocean-drone.mp3               # Needed by minute 6
+    - assets/audio/sub-bass-ocean-pressure.mp3        # Needed by minute 6
+    - assets/audio/storm-warm-resolve.mp3             # Needed by minute 8
+    - assets/audio/storm-cold-return.mp3              # Needed by minute 8
+    - assets/audio/waves-gentle-rock.mp3              # Needed by minute 8
+    - assets/audio/radio-loop-restart.mp3             # Needed by minute 8
+    - assets/audio/morning-calm-dawn.mp3              # Needed by minute 9

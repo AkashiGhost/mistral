@@ -1,0 +1,34 @@
+id: the-lighthouse
+title: "The Lighthouse"
+genre: horror-thriller
+subgenre: cosmic-isolation
+tone:
+  - unsettling
+  - isolated
+  - cosmic
+setting_summary: "Remote lighthouse on a rocky island during a violent storm. You are the keeper. The radio picks up a distress call that shouldn't exist."
+duration_target_minutes: 10
+word_budget: 1500
+choice_points: 3
+ending_variants: 4
+revelation_variants: 4
+characters_count: 1
+player_role: lighthouse_keeper
+narrator: radio_voice  # The radio voice IS the narrator — character voice, no separate narrator
+voice_model: character  # Character speaks directly to player
+atmosphere: false  # Pure dark screen
+content_rating: mature
+tags:
+  - horror
+  - lighthouse
+  - isolation
+  - cosmic
+  - voice-only
+  - single-npc
+  - eyes-closed
+tropes_as_foundation:
+  - "The Fog: radio contact with something that shouldn't be there"
+  - "Annihilation: the wrongness that creeps in through familiarity"
+  - "The Shining: isolation as a pressure cooker for the uncanny"
+  - "Event Horizon: something wearing the shape of a distress call"
+  - "1408: a place that is aware of you"

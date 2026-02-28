@@ -1,0 +1,817 @@
+##
+## ARC DEFINITION — "The Lighthouse"
+## File: stories/the-lighthouse/arc.yaml
+## Schema: schemas/arc-schema.json (draft-07)
+##
+## WHAT THIS FILE IS:
+##   The structural backbone of the story. The pipeline executes this as a state machine,
+##   advancing through 5 phases in order, firing beats sequentially, pausing at choice
+##   beats for player input, and resolving the ending when the final phase completes.
+##
+## HOW IT RELATES TO OTHER FILES:
+##   - radio-voice.yaml: owns the character card, voice rules, phase_behaviors
+##   - arc.yaml (this file): owns the structural sequence — what happens when and why
+##   - sounds/cue-map.yaml: owns the sound asset registry
+##   - sounds/timeline.yaml: owns the deterministic timed sound schedule
+##
+## TIMING MODEL:
+##   All time_ranges are targets, not hard locks. Word budgets enforce pacing.
+##   At 150 WPM average, total word budget 1500 words = ~10 minutes of narration.
+##   Player speaking time adds ~1-2 minutes. Total session: 8-12 minutes.
+##
+## PLAYER STYLE SCORING:
+##   The pipeline accumulates player_style_scores across all 3 choice beats.
+##   At Phase 4 entry, the dominant score selects the revelation variant.
+##   Maximum possible score per style: 7 points (across all 3 choices combined).
+##   Tie-breaking order: empathetic > nurturing > analytical > confrontational.
+##
+
+story_id: the-lighthouse
+
+central_conflict: >
+  A lighthouse keeper receives a distress call from a ship that cannot exist —
+  and realizes the voice on the radio knows things it should not
+
+theme: >
+  The cost of isolation, the seduction of connection, the thin line between
+  rescue and being consumed by what you tried to save
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PHASES
+# ─────────────────────────────────────────────────────────────────────────────
+# 5 phases. Sequential. Each phase owns its sound environment, character directive,
+# and beat sequence. The pipeline transitions on beat completion, not timers.
+# Timers are targets — word budgets are the enforcement mechanism.
+
+phases:
+
+  # ───────────────────────────────────────────────
+  # PHASE 1: CONTACT
+  # ───────────────────────────────────────────────
+  # Design goal: Normal distress call. Professional. Urgent but not supernatural.
+  # The full ambient soundscape is present: storm, waves, radio static, machinery.
+  # The voice on the radio is panicked, grateful, human. A ship in trouble.
+  # This phase is calibration: it reads how the player responds to someone in crisis
+  # (empathetic / analytical / nurturing / confrontational) to set up Phase 4.
+
+  - id: contact
+    name: "Contact"
+    time_range: "0:00-2:00"
+
+    purpose: >
+      Establish the setting through sound and the radio voice. Build rapport.
+      The player is alone in a lighthouse during a storm. The radio crackles to life.
+      A ship is in trouble. The voice is human, panicked, grateful for contact.
+      Completion criterion: the voice has established the distress situation and
+      the pipeline has collected at least one player_style_score increment.
+
+    sound_state:
+      # Full ambient: every sound is present. This is the baseline.
+      # The storm is the player's world. The radio is their only connection.
+      active: [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery, foghorn]
+      removed: []
+      added: []
+
+    character_behavior: >
+      Panicked but coherent. A sailor on a ship in a storm — voice cracking with
+      static, speaking quickly, grateful to reach someone. Urgently needs guidance:
+      "Can you hear me? God, can you hear me? We've been calling for hours."
+      The voice gives a ship name (the Meridian), says they're 12 nautical miles out,
+      engine trouble, losing bearing. Standard maritime distress call. Nothing wrong
+      yet except the storm and the fear. The voice is warm when the keeper responds —
+      the relief of not being alone. The voice uses contractions freely (panic mode).
+
+    beats:
+
+      # BEAT 1-1: The Call
+      # The radio crackles to life. A voice breaks through static.
+      # The player hears the full ambient soundscape for the first time.
+      # Storm, waves, machinery, radio — the lighthouse is alive and working.
+
+      - id: contact_opening
+        type: narration
+        word_budget: 150
+        purpose: >
+          The radio crackles to life. A voice breaks through heavy static — panicked,
+          breathless, mid-sentence. The player hears the storm raging outside, waves
+          hitting the rocks below, the lighthouse machinery turning above.
+          The voice is desperate for contact. They've been calling for hours.
+          "—anyone on this frequency? Mayday, mayday, this is the Meridian.
+          Can anyone hear me?"
+        prompt_hint: >
+          Open mid-transmission — the voice has been calling before the player
+          answered. The player picks up a radio. The voice is already talking.
+          Reference: wind howling against the lighthouse walls, the machinery
+          grinding overhead, waves crashing on the rocks below.
+          The voice sounds like someone who thought they were going to die alone.
+          The relief in their voice when the keeper answers is genuine.
+          [SOUND:radio_static] — fire with the first words.
+        sound_cues:
+          - sound_id: radio_burst
+            trigger: beat_start
+            volume: 0.6
+
+      # BEAT 1-2: Rapport
+      # The voice calms slightly. Gives details. The player engages.
+      # Standard distress protocol: location, heading, situation.
+      # The pipeline is reading: how does the player respond to crisis?
+
+      - id: contact_rapport
+        type: narration
+        word_budget: 150
+        purpose: >
+          The voice calms slightly now that contact is established. Provides details:
+          ship name Meridian, 12 nautical miles southwest, engine trouble, six crew,
+          losing bearing in the storm. Asks the keeper to guide them toward the light.
+          The keeper's light is the only thing they can see. Standard maritime exchange.
+          Nothing supernatural yet. The voice is human, scared, grateful.
+          The pipeline collects player_style_scores based on how the keeper responds.
+        prompt_hint: >
+          The voice should ask the keeper questions: "What's your bearing?" "How far
+          are the rocks from the shore?" "Is there a harbor?" Normal questions.
+          The voice is professional under the panic — a sailor, not a civilian.
+          They know maritime language. They're competent but overwhelmed.
+          If the player is quiet, the voice fills space with details about the storm,
+          the crew, the failing engine. They need the keeper to engage.
+        state_changes:
+          radio_voice.mutable_state.current_phase_behavior: "guidance"
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 2: GUIDANCE
+  # ───────────────────────────────────────────────
+  # Design goal: The keeper directs the ship. Things start to tilt.
+  # First impossibility: the voice knows specific details about the island.
+  # Not things you'd find on a chart — the color of the keeper's door,
+  # the number of steps to the lamp room. Mentioned casually, mid-sentence.
+  # Choice 1 lives here.
+  #
+  # Sound design: storm intensifies. Waves volume increases.
+  # The foghorn becomes less frequent (it is still the player's world, but
+  # the world is becoming less reliable).
+
+  - id: guidance
+    name: "Guidance"
+    time_range: "2:00-4:00"
+
+    purpose: >
+      The keeper guides the ship. The voice follows directions — or seems to.
+      First impossibility: the voice knows the island too well. Mentions the
+      keeper's red door, the 87 steps to the lamp room, the crack in the west wall.
+      Choice 1: how does the keeper respond to the impossible knowledge?
+      Completion criterion: Choice 1 resolved, first impossibility has landed.
+
+    sound_state:
+      active: [storm_wind, waves_crash, radio_static_ambient, lighthouse_machinery]
+      removed: []
+      added: []
+      volume_adjustments:
+        storm_wind: 0.7
+        # Storm intensifying — the wind gets louder, more present.
+        waves_crash: 0.65
+        # Waves closer, heavier. The sea is rising.
+
+    character_behavior: >
+      Still human. Still scared. But now there are slips — details about the island
+      that a ship 12 miles out could not know. The voice mentions the keeper's red
+      door ("We can see the light — is the door still red?"), the 87 steps to the
+      lamp room, the crack in the west wall where the draft comes through.
+      Delivered casually, mid-sentence, as navigation context. When the keeper
+      reacts, the voice is confused: "It's on the charts, isn't it? I must have read
+      it somewhere." The voice still uses contractions. Still panicked. Still human.
+      The first cracks are in what it knows, not how it sounds.
+
+    beats:
+
+      # BEAT 2-1: First Impossibility
+      # The voice mentions something about the island it cannot know.
+      # Delivered as navigation context, not revelation.
+
+      - id: first_impossibility
+        type: narration
+        word_budget: 120
+        purpose: >
+          The voice is asking for guidance — bearing, distance, hazards. Mid-sentence,
+          it mentions the keeper's red door: "We can see the light. Is the door still
+          red? I remember it being red." This is impossible. The door is red. But a
+          ship 12 miles out in a storm cannot see the door, let alone know its color.
+          The voice continues as if it said nothing unusual. The storm intensifies.
+        prompt_hint: >
+          DO NOT announce this as a revelation. The voice slips it in mid-navigation:
+          "Coming about to your bearing now. The rocks on the north side — are they
+          still exposed at high tide? And is the door still red?" Then it continues
+          asking about depth soundings as if nothing happened. The wrongness is in
+          the casualness. [SOUND:waves_close] — waves getting louder during this beat.
+        sound_cues:
+          - sound_id: waves_close
+            trigger: beat_start
+            volume: 0.65
+
+      # BEAT 2-2: CHOICE 1 — The Impossible Knowledge
+      # The keeper must respond to the voice knowing the island too well.
+
+      - id: choice_impossible_knowledge
+        type: choice
+        word_budget: 100
+        purpose: >
+          The keeper responds to the voice knowing impossible details about the island.
+          Choice 1 (~2:30). Each response advances a different player_style score.
+          All paths continue to the escalation beat.
+        prompt_hint: >
+          The voice has said something impossible and kept talking. There's a natural
+          pause — static crackles, the voice waits for a response.
+          "You still there, keeper? Did I lose you?"
+        options:
+
+          - id: probe-gently
+            label: "Ask how they know — empathetic curiosity"
+            player_says_like:
+              - "How do you know what color my door is?"
+              - "That's... oddly specific. Have you been to this island before?"
+              - "You said you remember the door being red. When were you here?"
+              - "I'm curious — how would you know that from 12 miles out?"
+            consequence: >
+              A beat of static. Then the voice, softer: "I... I don't know why I said
+              that. It just came out. Like I've been here before, but I haven't.
+              I know I haven't." The voice sounds genuinely confused, which is worse
+              than if it had a ready answer. Trust increases.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "+1"
+              game.player_style_scores.empathetic: "+2"
+            style_score:
+              empathetic: 2
+
+          - id: demand-answer
+            label: "Challenge them directly — confrontational"
+            player_says_like:
+              - "You can't see the door from 12 miles out. Who are you?"
+              - "Stop. That's impossible. Tell me who you really are."
+              - "Nobody can see the color of a door in this storm. Explain."
+              - "That's not on any chart. How do you know that?"
+            consequence: >
+              Static. Then the voice, defensive: "I'm trying to get my crew home,
+              keeper. Does it matter what color I think your door is?" The defensiveness
+              is human — too human, like someone cornered over a detail they can't
+              explain. The voice deflects by asking about the rocks again.
+              Trust decreases.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "-1"
+              game.player_style_scores.confrontational: "+2"
+            style_score:
+              confrontational: 2
+
+          - id: guide-past-it
+            label: "Ignore it and keep guiding — nurturing response"
+            player_says_like:
+              - "Let's focus on getting you in safe. What's your current heading?"
+              - "Never mind the door. Tell me your position."
+              - "We can talk about that later. Right now I need your bearing."
+              - "Doesn't matter. What matters is getting your crew to shore."
+            consequence: >
+              The voice exhales — relief, maybe gratitude. "Right. Right, sorry.
+              Heading two-seven-zero, speed three knots. The engine's barely holding."
+              It returns to navigation. But the door is still red. The voice still knew.
+              Trust increases. The voice remembers the keeper chose them over the question.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "+2"
+              game.player_style_scores.nurturing: "+2"
+            style_score:
+              nurturing: 2
+
+          - id: note-anomaly
+            label: "File it and continue — analytical response"
+            player_says_like:
+              - "That's not information you should have. I'm noting it. Continue with your heading."
+              - "Interesting. The door is red. How you know that is a question for later. Give me your bearing."
+              - "That detail shouldn't be available to you at this distance. I'm going to proceed but I want to return to this."
+            consequence: >
+              The voice pauses. Then: "You're a careful one, aren't you?" Something
+              shifts — not threatening, but the voice has registered that this keeper
+              pays attention. It gives the heading, precise and professional.
+              Trust increases. The voice files this: the keeper sees patterns.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "+1"
+              game.player_style_scores.analytical: "+2"
+            style_score:
+              analytical: 2
+
+      # BEAT 2-3: Escalation
+      # More impossibilities. The voice knows the number of steps.
+      # The ship should be getting closer but the bearing doesn't change.
+      # The storm sound shifts — subtly wrong.
+
+      - id: guidance_escalation
+        type: narration
+        word_budget: 130
+        purpose: >
+          The voice mentions the 87 steps to the lamp room ("Must be hell climbing
+          those 87 steps in weather like this"). It also describes the crack in the
+          west wall where the draft comes through. The ship should be closer by now
+          but the voice says the bearing hasn't changed. Something is wrong with
+          the geometry. The ship is not getting closer by moving through water.
+        prompt_hint: >
+          The voice drops these details in navigation context — asking about
+          landmarks, checking its approach. "That west wall of yours — does it
+          still let the draft in? I'd fix that before winter sets in proper."
+          The wrongness is accumulating. Each detail alone is deniable. Together
+          they form a shape the keeper cannot ignore.
+        state_changes:
+          radio_voice.mutable_state.secrets_revealed: ["knows_island_details"]
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 3: WRONGNESS
+  # ───────────────────────────────────────────────
+  # Design goal: The uncanny becomes undeniable. The voice knows the keeper's name
+  # without being told. Describes the interior of the lighthouse — the desk,
+  # the photograph, the coffee mug with the chipped handle. The storm peaks
+  # then starts to DROP. Machinery sounds disappear one by one.
+  # This is subtractive horror: the storm going quiet is worse than it getting loud.
+  # Choice 2 lives here.
+  #
+  # Sound design: storm peaks at 4:30 then begins dropping. Machinery stops at 5:00.
+  # Foghorn goes silent at 5:30. By end of phase, only waves and radio static remain.
+
+  - id: wrongness
+    name: "Wrongness"
+    time_range: "4:00-6:00"
+
+    purpose: >
+      The voice knows the keeper's name. Describes the lighthouse interior.
+      The storm drops — silence is the new horror. Machinery disappears.
+      Choice 2: confront the voice or keep it talking.
+      Completion criterion: Choice 2 resolved, the voice has used the keeper's name,
+      at least two machinery sounds have been removed.
+
+    sound_state:
+      # Machinery removed at 5:00. Foghorn gone by 5:30.
+      # Storm volume drops dramatically — the silence is wrong.
+      active: [storm_wind, waves_crash, radio_static_ambient]
+      removed: [lighthouse_machinery, foghorn]
+      added: []
+      volume_adjustments:
+        storm_wind: 0.3
+        # Storm has dropped. Not calmed — dropped. The distinction matters.
+        # A storm that calms is natural. A storm that drops is unnatural.
+        waves_crash: 0.4
+        # Waves still present but muted, as if the sea is holding its breath.
+
+    character_behavior: >
+      The voice drops the panic. It is calmer now — too calm for someone in a storm.
+      It uses the keeper's name without being told it. When asked how it knows:
+      "You told me. Didn't you? I thought you told me." It describes the lighthouse
+      interior: the desk by the east window, the photograph of someone the keeper
+      loved, the coffee mug with the chipped handle. Delivered not as revelations
+      but as shared memories — "Is the photograph still by the window? The one with
+      the — well, you know which one." The voice has stopped using contractions
+      as frequently. Its speech is becoming more measured, more precise. It is
+      becoming more itself.
+
+    beats:
+
+      # BEAT 3-1: The Name
+      # The voice says the keeper's name. It has not been given.
+      # The machinery stops. The silence that follows is structural.
+
+      - id: the_name
+        type: narration
+        word_budget: 120
+        purpose: >
+          The voice uses the keeper's name mid-sentence, casually, as if they are
+          old friends. "Listen, [keeper's name], the current's shifting. I need you
+          to—" Then it stops. Static. When it returns: "I'm sorry. Where were we?"
+          The lighthouse machinery goes silent — not gradually, but with a shudder
+          and a stop. The grinding that has been the lighthouse's heartbeat since
+          the game began is gone. The silence is physical.
+        prompt_hint: >
+          The voice uses the name in a moment of urgency — it slips out like something
+          natural. That's the horror: it IS natural to the voice. They know the name
+          the way they know the red door and the 87 steps. It is information they
+          have always had. [SOUND:machinery_stop] fires at 5:00.
+          After the machinery stops, reference the silence: the lighthouse feels
+          different without its heartbeat. The beam still turns — but the sound is gone.
+        sound_cues:
+          - sound_id: machinery_stop
+            trigger: "5:00"
+            volume: 0.0
+
+      # BEAT 3-2: CHOICE 2 — The Interior
+      # The voice describes the lighthouse interior. The keeper must respond.
+      # The foghorn goes silent during or just after this beat.
+
+      - id: choice_interior_knowledge
+        type: choice
+        word_budget: 100
+        purpose: >
+          The voice describes the lighthouse interior in detail it cannot have.
+          Choice 2 (~5:00). The keeper decides how to engage with a voice that
+          knows their home from the inside. The foghorn dies during this beat.
+        prompt_hint: >
+          The voice describes something deeply personal: the photograph by the
+          window, the coffee mug with the chipped handle, the specific book on
+          the desk. Then: "I can picture it. All of it. Like I've been there."
+          The foghorn goes silent. [SOUND:foghorn_stop] at ~5:30.
+          The keeper must respond.
+        options:
+
+          - id: confront-identity
+            label: "Demand to know who they are — confrontational"
+            player_says_like:
+              - "Who ARE you? How do you know what my lighthouse looks like inside?"
+              - "Stop. You're describing my home. How?"
+              - "No one has been in this lighthouse but me. Tell me the truth."
+              - "You're not on a ship, are you?"
+            consequence: >
+              Long static. The voice comes back quieter, almost wounded: "I'm trying
+              to get home, keeper. I don't know how I know these things. I just do.
+              Don't make me say I'm crazy. I'm already scared enough."
+              Trust decreases. But the voice has registered the confrontation —
+              and something in its tone suggests it expected this question.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "-1"
+              game.player_style_scores.confrontational: "+2"
+              game.player_style_scores.analytical: "+1"
+            style_score:
+              confrontational: 2
+              analytical: 1
+
+          - id: comfort-voice
+            label: "Reassure the voice — empathetic response"
+            player_says_like:
+              - "It's OK. You're scared and the storm is bad. People say strange things."
+              - "I'm still here. Whatever's happening, I'm not going anywhere."
+              - "You're going to be fine. Just stay on the radio."
+              - "Storms do strange things to people. I'm going to keep you talking."
+            consequence: >
+              The voice exhales. You can hear it even through the static: relief.
+              "Thank you. Thank you for not — for just staying." The voice sounds
+              like it is trying not to cry. Trust increases. The voice files this:
+              the keeper chose compassion over answers. This will matter.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "+2"
+              game.player_style_scores.empathetic: "+2"
+            style_score:
+              empathetic: 2
+
+          - id: keep-talking
+            label: "Keep the voice talking — nurturing response"
+            player_says_like:
+              - "Tell me more about what you see. Describe the ship."
+              - "Stay with me. What can you see from where you are?"
+              - "Let's keep going. What's the situation on your deck?"
+              - "I need you to focus. What's in front of you right now?"
+            consequence: >
+              The voice latches onto the question. "The deck. Right. The deck is —"
+              A pause. Then: "I can see the light. Your light. It's the only thing
+              I can see." The voice sounds grateful for direction. It needs the
+              keeper to keep it talking. It is holding on to the keeper the way
+              the keeper is holding on to it. Trust increases.
+            state_changes:
+              radio_voice.mutable_state.trust_level: "+1"
+              game.player_style_scores.nurturing: "+2"
+            style_score:
+              nurturing: 2
+
+          - id: test-knowledge
+            label: "Test the voice's knowledge — analytical response"
+            player_says_like:
+              - "You described a photograph. Tell me who's in it."
+              - "If you can see my lighthouse so well, what's on the top shelf?"
+              - "The mug with the chipped handle — what color is it?"
+              - "You said 87 steps. You said the red door. Tell me something only I would know."
+            consequence: >
+              The voice is quiet for a moment. Then, slowly, precisely: it answers
+              correctly. It gets the detail right. Not approximately — exactly. The
+              voice sounds as surprised as the keeper: "How do I know that? I don't —
+              I don't know how I know that." Trust stays neutral. But the voice has
+              been tested and the answer was correct. That is worse than being wrong.
+            state_changes:
+              game.player_style_scores.analytical: "+2"
+            style_score:
+              analytical: 2
+
+      # BEAT 3-3: The Storm Drops
+      # The storm goes quiet. Not gradually — it drops.
+      # This is the audio equivalent of the floor tilting.
+      # The voice notices too: "It stopped. The storm — it just stopped."
+
+      - id: storm_drops
+        type: narration
+        word_budget: 130
+        purpose: >
+          The storm drops. Not fades — drops. Wind dies. Waves recede to a low,
+          rhythmic pulse. The silence is enormous. The voice notices: "Did the
+          storm just — is it over? That's not how storms work." The voice sounds
+          as unsettled as the keeper should feel. In the new quiet, the radio
+          static is louder, more present, almost like breathing. The voice and
+          the keeper are now alone in a way that feels different from isolation.
+          The foghorn should be gone by now. Only waves and radio static remain.
+        prompt_hint: >
+          The storm dropping is the key audio moment of Phase 3. Reference it
+          explicitly: the wind was howling a moment ago. Now nothing. The beam
+          still turns — you can hear it creak without the machinery covering it.
+          The silence is not peaceful. It is held, like a breath before a scream.
+          [SOUND:storm_drop] fires at the start of this beat.
+        sound_cues:
+          - sound_id: storm_drop
+            trigger: beat_start
+            volume: 0.0
+        state_changes:
+          radio_voice.mutable_state.secrets_revealed: ["knows_keeper_name", "knows_lighthouse_interior"]
+          radio_voice.mutable_state.current_phase_behavior: "revelation"
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 4: REVELATION
+  # ───────────────────────────────────────────────
+  # Design goal: 2 seconds of absolute silence. Then the voice, calm, clear,
+  # no static: "There is no ship." The voice tells the keeper what it is.
+  # The variant depends on accumulated player_style_scores.
+  # Choice 3 lives here.
+  #
+  # Sound design: 2 seconds of total silence (no waves, no static, nothing).
+  # Then a deep ocean drone — low, vast, sourceless. The voice is clear now,
+  # no static. That clarity is the horror: the radio was never the medium.
+
+  - id: revelation
+    name: "Revelation"
+    time_range: "6:00-8:00"
+
+    purpose: >
+      2 seconds of absolute silence. Then: "There is no ship."
+      The voice reveals its true nature, determined by player_style_scores.
+      Choice 3: the keeper decides what to do with the truth.
+      Completion criterion: revelation delivered, Choice 3 resolved, ending route locked.
+
+    sound_state:
+      active: []
+      removed: [storm_wind, waves_crash, radio_static_ambient]
+      added: [deep_ocean_drone]
+
+    character_behavior: >
+      The panic is gone. The voice is calm, clear, measured. No radio static.
+      The voice sounds like it is in the room, not on a radio. That shift in
+      audio quality IS the revelation — before the words land, the sound does.
+      It speaks from its true nature. No contractions. No fragments. Complete
+      sentences, chosen carefully. It does not apologize for what it is.
+      It does not explain unless asked. It has said the true thing.
+
+    beats:
+
+      # BEAT 4-1: The Silence
+      # 2 seconds of absolute nothing. No waves. No static. No wind. Nothing.
+      # The player experiences total audio isolation.
+
+      - id: revelation_silence
+        type: silence
+        word_budget: 0
+        silence_duration_seconds: 2
+        purpose: >
+          2 seconds of ABSOLUTE silence. No waves. No wind. No static. No machinery.
+          Nothing. The player experiences total audio isolation. This silence is the
+          single most important moment in the sound design. Its effectiveness depends
+          on the preceding 6 minutes of storm and static — each sound was preparation
+          for its absence.
+        prompt_hint: >
+          Pipeline hard requirement: 2 seconds of silence before any audio output.
+          No narrator text during this beat. Word budget is 0.
+          After this beat completes, pipeline transitions to revelation beat.
+        sound_cues:
+          - sound_id: silence_absolute
+            trigger: beat_start
+            volume: 0.0
+
+      # BEAT 4-2: "There Is No Ship"
+      # The voice speaks. Clear. No static. The revelation line.
+      # The deep ocean drone enters — vast, sourceless, oceanic.
+
+      - id: revelation_truth
+        type: revelation
+        word_budget: 200
+        purpose: >
+          "There is no ship." Delivered calmly, clearly, without static.
+          The voice then reveals what it is — variant-dependent. The deep ocean
+          drone enters: low, vast, the sound of something enormous and patient.
+          After the revelation, the voice waits. The keeper must process.
+        prompt_hint: >
+          [SOUND:deep_ocean_drone] fades in as the voice speaks.
+          The voice opens with: "There is no ship." Then a pause.
+          Then the variant-specific revelation. Deliver the revelation_line
+          verbatim from radio-voice.yaml. Do not elaborate unless the keeper asks.
+          The voice is calm. The calmness is the horror.
+          If the keeper is silent for 15+ seconds: "You're still there. Good.
+          I wasn't sure you would be."
+        sound_cues:
+          - sound_id: deep_ocean_drone
+            trigger: beat_start
+            volume: 0.35
+          - sound_id: sub_bass
+            trigger: beat_start
+            volume: 0.1
+        state_changes:
+          radio_voice.mutable_state.emotional_state: "revealed"
+          radio_voice.mutable_state.active_variant: "determined_by_revelation_logic"
+          game.flags.revelation_delivered: true
+
+      # BEAT 4-3: CHOICE 3 — The Final Choice
+      # The keeper decides what to do with the truth.
+      # This choice determines the ending.
+
+      - id: choice_final
+        type: choice
+        word_budget: 80
+        purpose: >
+          The keeper now knows what the voice is. They choose what to do.
+          Choice 3 (~7:00). Combined with revelation variant, determines ending.
+        prompt_hint: >
+          The voice does not present options. It waits.
+          If the keeper is silent: "The light is still on. What do you want to do?"
+        options:
+
+          - id: stay-connected
+            label: "Keep the radio on — acceptance"
+            player_says_like:
+              - "I'm not hanging up."
+              - "I'll stay. I'll keep the light on."
+              - "I hear you. I'm staying on the line."
+              - "OK. Whatever you are — I'm here."
+              - "You're not alone. Neither am I."
+            consequence: >
+              The voice is quiet. When it speaks again, it sounds different — not
+              smaller, but closer. More present. "Thank you." Not relief. Something
+              deeper. The keeper has chosen connection over self-preservation.
+              The light stays on. The voice stays.
+            state_changes:
+              game.choices.final_choice: "accept"
+              game.flags.ending_route: "acceptance"
+
+          - id: hang-up
+            label: "Turn off the radio — rejection"
+            player_says_like:
+              - "I'm turning this off."
+              - "I'm hanging up. This conversation is over."
+              - "No. I don't want to hear any more."
+              - "Whatever you are, I'm done."
+              - "Goodbye."
+            consequence: >
+              Silence. Then a sound like static, but not static — something
+              between a sigh and the sea. The radio crackles. The voice comes
+              back: same words, same panic, same "Can anyone hear me?"
+              The loop has begun.
+            state_changes:
+              game.choices.final_choice: "reject"
+              game.flags.ending_route: "loop"
+
+          - id: release-voice
+            label: "Tell them it's OK to stop — compassionate release"
+            player_says_like:
+              - "You can stop calling now."
+              - "It's OK. You don't have to keep looking for someone to answer."
+              - "I hear you. You're heard. You can rest now."
+              - "You've been calling for a long time. It's OK to stop."
+              - "I'm going to stay until morning. You don't have to."
+            consequence: >
+              The voice goes very quiet. Then, something that sounds almost like
+              a laugh, or a sob, or the wind: "You're the first one who ever said
+              that." The static fades. Slowly. Like a tide going out.
+              The keeper has released the voice.
+            state_changes:
+              game.choices.final_choice: "release"
+              game.flags.ending_route: "release"
+
+          - id: question-reality
+            label: "Question your own existence — existential"
+            player_says_like:
+              - "If there's no ship... how long have I been in this lighthouse?"
+              - "When did I get here? I can't remember arriving."
+              - "Wait. If you're not real, am I?"
+              - "I don't remember coming to this island."
+              - "How long have I been answering this radio?"
+            consequence: >
+              The voice is very still. Then: "That's the question, isn't it?"
+              A long pause. "I was wondering when you'd ask."
+              The ground has shifted. The keeper is no longer sure they are the
+              keeper. The lighthouse may not be the lighthouse. The voice may
+              be the only real thing here.
+            state_changes:
+              game.choices.final_choice: "question"
+              game.flags.ending_route: "dissolution"
+
+
+  # ───────────────────────────────────────────────
+  # PHASE 5: RESOLUTION
+  # ───────────────────────────────────────────────
+  # Design goal: Ending. 4 variants based on revelation + final choice.
+  # The last line the player hears must be hand-crafted.
+  # Sound design carries the emotional weight — the voice wraps up.
+
+  - id: resolution
+    name: "Resolution"
+    time_range: "8:00-10:00"
+
+    purpose: >
+      The ending. References the keeper's specific earlier choices and words.
+      4 ending paths. The final line is hand-crafted per ending variant.
+      Completion criterion: final line delivered, sound design resolves.
+
+    sound_state:
+      # Ending-variant sounds. See timeline.yaml for specifics.
+      active: []  # Determined by ending variant
+      removed: []
+      added: []
+
+    character_behavior: >
+      The voice delivers the ending. It references specific things the keeper said —
+      their words from Phase 1, their reaction in Phase 2, their choice in Phase 3.
+      The keeper's playthrough is reflected back at them. Every ending is personal.
+      The voice is at its most honest. The final line is always delivered slowly,
+      with weight, and then the voice is gone.
+
+    beats:
+
+      # BEAT 5-1: Resolution Narration
+      # The voice wraps the story. Ending-specific content.
+
+      - id: resolution_narration
+        type: narration
+        word_budget: 200
+        purpose: >
+          The voice delivers the ending. References 2-3 specific things the keeper
+          said earlier. Makes the playthrough feel personal and seen.
+          The ending variant determines tone, content, and sound design.
+        prompt_hint: >
+          Use the keeper's own words from earlier phases. Echo their language.
+          Make them feel that the entire experience was listening to them as much
+          as they were listening to the voice.
+          See phase-overrides.yaml Phase 5 for detailed ending instructions.
+
+      # BEAT 5-2: Final Line
+      # Hand-crafted. Not improvised. The last sound the player hears.
+
+      - id: final_line
+        type: narration
+        word_budget: 50
+        purpose: >
+          The absolute last thing the player hears. Hand-crafted per ending.
+          Do not improvise this line. Pull from the ending specification.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# REVELATION LOGIC
+# ─────────────────────────────────────────────────────────────────────────────
+# At Phase 4 entry, the pipeline calculates the dominant player_style and
+# selects the matching revelation variant from radio-voice.yaml.
+
+revelation_logic:
+  trigger: "phase_4_entry"
+  source: "game.player_style_scores"
+  tie_breaking_order: [empathetic, nurturing, analytical, confrontational]
+  mapping:
+    empathetic: last_keeper
+    analytical: signal_entity
+    nurturing: time_loop
+    confrontational: the_sea
+
+# ─────────────────────────────────────────────────────────────────────────────
+# ENDING CONDITIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# The combination of revelation variant + Choice 3 determines which ending file loads.
+# Each ending has a primary path and an alternate.
+
+ending_conditions:
+
+  acceptance:
+    description: >
+      The keeper keeps the light on. The voice stays. Not alone anymore.
+      Warm, bittersweet. The storm breaks. Dawn is suggested but not shown.
+    primary_path: "final_choice == 'accept'"
+    alternate_path: "final_choice == 'release' AND trust_level >= 7"
+    sound_signature: [storm_warm, waves_gentle]
+    final_line: "The light stays on. The voice stays. You are not alone on this island. You never were."
+
+  loop:
+    description: >
+      The keeper hangs up. The radio crackles. Same voice. Same words. Same storm.
+      Dread, cyclical. The call has always been happening.
+    primary_path: "final_choice == 'reject'"
+    alternate_path: "final_choice == 'accept' AND trust_level <= 2"
+    sound_signature: [radio_loop, storm_cold]
+    final_line: "Mayday, mayday, this is the Meridian. Can anyone hear me?"
+
+  release:
+    description: >
+      The keeper tells the voice it's OK to stop. Static fades. Morning comes.
+      Sad, peaceful. Something ended that needed to end.
+    primary_path: "final_choice == 'release'"
+    alternate_path: "final_choice == 'accept' AND revelation_variant == 'time_loop'"
+    sound_signature: [morning_calm, waves_gentle]
+    final_line: "The static fades. The morning is very quiet. Something that needed to end has ended."
+
+  dissolution:
+    description: >
+      The keeper realizes they can't remember arriving. The lighthouse,
+      the storm, the voice — all equally real, all equally uncertain.
+      Existential, vast.
+    primary_path: "final_choice == 'question'"
+    alternate_path: "final_choice == 'reject' AND revelation_variant == 'the_sea'"
+    sound_signature: [deep_ocean_drone, sub_bass]
+    final_line: "You cannot remember arriving at the lighthouse. You have always been here. The light turns, and turns, and turns."

@@ -1,104 +1,308 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Image from "next/image";
 
-interface OnboardingFlowProps {
-  onComplete: () => void;
+// ─────────────────────────────────────────────
+// Story-specific onboarding data
+// Scene images + text overlays + first audio line
+// The LAST text shown is the FIRST line the AI speaks (image-to-audio bridge)
+// ─────────────────────────────────────────────
+
+interface StoryOnboarding {
+  scenes: Array<{
+    image: string;
+    text: string;
+  }>;
+  firstAudioLine: string;
 }
 
-const STEPS = [
-  {
-    title: "You are a therapist",
-    subtitle:
-      "It's late. Your last patient of the night has arrived. Her name is Elara.",
+const STORY_ONBOARDING: Record<string, StoryOnboarding> = {
+  "the-lighthouse": {
+    scenes: [
+      {
+        image: "/images/stories/the-lighthouse/scene-1.webp",
+        text: "A storm is building off the coast. You're alone in the lighthouse. The radio hasn't made a sound in weeks.",
+      },
+      {
+        image: "/images/stories/the-lighthouse/scene-2.webp",
+        text: "The radio crackles. A voice: 'Hello? Is someone there?'",
+      },
+    ],
+    firstAudioLine: "Hello? Is someone there? Thank god. We're taking on water.",
   },
-  {
-    title: "Put on headphones",
-    subtitle: "This is a voice experience — speak naturally and listen closely.",
+  "room-4b": {
+    scenes: [
+      {
+        image: "/images/stories/room-4b/scene-1.webp",
+        text: "St. Maren's Hospital. Decommissioned. Your shift starts at midnight.",
+      },
+      {
+        image: "/images/stories/room-4b/scene-2.webp",
+        text: "You step into the hallway. The fluorescent light flickers twice, then holds.",
+      },
+    ],
+    firstAudioLine:
+      "You step into the hallway. The fluorescent light flickers twice, then holds. Your shift has begun.",
   },
-  {
-    title: "Close your eyes",
-    subtitle: "The session begins in...",
-    countdown: true,
+  "the-last-session": {
+    scenes: [
+      {
+        image: "/images/stories/the-last-session/card.webp",
+        text: "You are a therapist. It's late. Your last patient has arrived.",
+      },
+    ],
+    firstAudioLine: "... Hello, Doctor. Thank you for seeing me tonight.",
   },
-];
+};
 
-export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
-  const [step, setStep] = useState(0);
+type OnboardingStep = "scene" | "headphones" | "countdown";
+
+interface OnboardingFlowProps {
+  storyId: string;
+  onComplete: (firstMessage: string) => void;
+}
+
+export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
+  const onboarding = STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING["the-last-session"];
+  const totalScenes = onboarding.scenes.length;
+
+  const [step, setStep] = useState<OnboardingStep>("scene");
+  const [sceneIndex, setSceneIndex] = useState(0);
+  const [showContinue, setShowContinue] = useState(false);
+  const [continueOpacity, setContinueOpacity] = useState(0);
+  const [textOpacity, setTextOpacity] = useState(0);
   const [countdown, setCountdown] = useState(3);
-  const currentStep = STEPS[step];
 
-  const advance = useCallback(() => {
-    if (step < STEPS.length - 1) {
-      setStep(step + 1);
-    }
-  }, [step]);
+  const currentScene = onboarding.scenes[sceneIndex];
 
-  // Countdown on final step
+  // ── Delayed text fade-in (1s after scene loads) ──────────────
   useEffect(() => {
-    if (!currentStep.countdown) return;
+    if (step !== "scene") return;
+    setTextOpacity(0);
+    const timer = setTimeout(() => setTextOpacity(1), 800);
+    return () => clearTimeout(timer);
+  }, [step, sceneIndex]);
 
+  // ── Delayed continue button (invisible 4s, fade in 1s) ──────
+  useEffect(() => {
+    if (step !== "scene") return;
+    setShowContinue(false);
+    setContinueOpacity(0);
+
+    const showTimer = setTimeout(() => {
+      setShowContinue(true);
+      // Start opacity fade after showing
+      requestAnimationFrame(() => {
+        setContinueOpacity(1);
+      });
+    }, 4000);
+
+    return () => clearTimeout(showTimer);
+  }, [step, sceneIndex]);
+
+  // ── Countdown timer ──────────────────────────────────────────
+  useEffect(() => {
+    if (step !== "countdown") return;
     if (countdown <= 0) {
-      onComplete();
+      onComplete(onboarding.firstAudioLine);
       return;
     }
-
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     return () => clearTimeout(timer);
-  }, [countdown, currentStep.countdown, onComplete]);
+  }, [step, countdown, onComplete, onboarding.firstAudioLine]);
 
-  return (
-    <div
-      style={{
-        position: "fixed",
-        inset: 0,
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        backgroundColor: "var(--color-bg)",
-        zIndex: 100,
-        padding: "var(--space-8)",
-        textAlign: "center",
-      }}
-      className="fade-in"
-    >
-      <h2
+  const advance = useCallback(() => {
+    if (step === "scene") {
+      if (sceneIndex < totalScenes - 1) {
+        setSceneIndex(sceneIndex + 1);
+      } else {
+        setStep("headphones");
+      }
+    } else if (step === "headphones") {
+      setStep("countdown");
+    }
+  }, [step, sceneIndex, totalScenes]);
+
+  // ── Scene step: image + text + delayed continue ──────────────
+  if (step === "scene" && currentScene) {
+    return (
+      <div
+        className="fade-in"
         style={{
-          fontSize: "var(--font-size-2xl)",
-          fontWeight: 400,
-          fontFamily: "var(--font-body)",
-          marginBottom: "var(--space-4)",
-          color: "var(--color-text-primary)",
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "var(--color-bg)",
+          zIndex: 100,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
         }}
       >
-        {currentStep.title}
-      </h2>
-
-      <p
-        style={{
-          fontSize: "var(--font-size-lg)",
-          color: "var(--color-text-secondary)",
-          marginBottom: "var(--space-8)",
-          maxWidth: "28ch",
-        }}
-      >
-        {currentStep.subtitle}
-      </p>
-
-      {currentStep.countdown ? (
+        {/* Scene image */}
         <div
           style={{
-            fontSize: "var(--font-size-3xl)",
-            color: "var(--color-accent)",
-            fontFamily: "var(--font-body)",
-            fontWeight: 300,
+            position: "relative",
+            width: "100%",
+            maxWidth: 600,
+            aspectRatio: "16 / 9",
+            overflow: "hidden",
+            borderRadius: "var(--radius-md)",
           }}
         >
-          {countdown}
+          <Image
+            src={currentScene.image}
+            alt=""
+            fill
+            sizes="(max-width: 600px) 100vw, 600px"
+            style={{ objectFit: "cover" }}
+            priority
+          />
+          {/* Dark overlay for text */}
+          <div
+            style={{
+              position: "absolute",
+              inset: 0,
+              background:
+                "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent 100%)",
+            }}
+          />
         </div>
-      ) : (
+
+        {/* Scene text */}
+        <p
+          style={{
+            maxWidth: 480,
+            textAlign: "center",
+            padding: "var(--space-6) var(--space-4)",
+            color: "var(--color-text-secondary)",
+            fontSize: "var(--font-size-lg)",
+            fontFamily: "var(--font-body)",
+            fontStyle: "italic",
+            lineHeight: 1.6,
+            opacity: textOpacity,
+            transition: "opacity 1.5s ease",
+          }}
+        >
+          {currentScene.text}
+        </p>
+
+        {/* Continue button — invisible for 4s, fades in over 1s */}
+        <div
+          style={{
+            height: 48,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          {showContinue && (
+            <button
+              type="button"
+              onClick={advance}
+              style={{
+                background: "none",
+                border: "none",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--font-size-sm)",
+                fontFamily: "var(--font-ui)",
+                cursor: "pointer",
+                letterSpacing: "0.06em",
+                opacity: continueOpacity,
+                transition: "opacity 1s ease",
+                padding: "var(--space-2) var(--space-4)",
+              }}
+            >
+              continue
+            </button>
+          )}
+        </div>
+
+        {/* Scene indicators */}
+        {totalScenes > 1 && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: "var(--space-6)",
+              display: "flex",
+              gap: "var(--space-2)",
+            }}
+          >
+            {onboarding.scenes.map((_, i) => (
+              <div
+                key={i}
+                style={{
+                  width: 6,
+                  height: 6,
+                  borderRadius: "var(--radius-full)",
+                  backgroundColor:
+                    i <= sceneIndex
+                      ? "var(--color-accent)"
+                      : "var(--color-text-muted)",
+                  opacity: i <= sceneIndex ? 1 : 0.3,
+                  transition: "var(--transition-normal)",
+                }}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Headphones step ──────────────────────────────────────────
+  if (step === "headphones") {
+    return (
+      <div
+        className="fade-in"
+        style={{
+          position: "fixed",
+          inset: 0,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          justifyContent: "center",
+          backgroundColor: "var(--color-bg)",
+          zIndex: 100,
+          padding: "var(--space-8)",
+          textAlign: "center",
+        }}
+      >
+        <h2
+          style={{
+            fontSize: "var(--font-size-2xl)",
+            fontWeight: 400,
+            fontFamily: "var(--font-body)",
+            marginBottom: "var(--space-4)",
+            color: "var(--color-text-primary)",
+          }}
+        >
+          Put on headphones
+        </h2>
+        <p
+          style={{
+            fontSize: "var(--font-size-lg)",
+            color: "var(--color-text-secondary)",
+            marginBottom: "var(--space-2)",
+            maxWidth: "28ch",
+          }}
+        >
+          Speak naturally. Listen closely.
+        </p>
+        <p
+          style={{
+            fontSize: "var(--font-size-sm)",
+            color: "var(--color-text-muted)",
+            marginBottom: "var(--space-8)",
+            maxWidth: "28ch",
+            fontStyle: "italic",
+          }}
+        >
+          Close your eyes when the countdown ends.
+        </p>
         <button
+          type="button"
           onClick={advance}
           style={{
             minHeight: "var(--touch-min)",
@@ -114,34 +318,48 @@ export function OnboardingFlow({ onComplete }: OnboardingFlowProps) {
             backgroundColor: "transparent",
           }}
         >
-          Continue
+          Ready
         </button>
-      )}
+      </div>
+    );
+  }
 
-      {/* Step indicators */}
-      <div
+  // ── Countdown step ───────────────────────────────────────────
+  return (
+    <div
+      className="fade-in"
+      style={{
+        position: "fixed",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        backgroundColor: "var(--color-bg)",
+        zIndex: 100,
+        padding: "var(--space-8)",
+        textAlign: "center",
+      }}
+    >
+      <p
         style={{
-          position: "absolute",
-          bottom: "var(--space-8)",
-          display: "flex",
-          gap: "var(--space-2)",
+          fontSize: "var(--font-size-lg)",
+          color: "var(--color-text-secondary)",
+          marginBottom: "var(--space-6)",
+          fontFamily: "var(--font-body)",
         }}
       >
-        {STEPS.map((_, i) => (
-          <div
-            key={i}
-            style={{
-              width: 8,
-              height: 8,
-              borderRadius: "var(--radius-full)",
-              backgroundColor:
-                i <= step
-                  ? "var(--color-accent)"
-                  : "var(--color-text-muted)",
-              transition: "var(--transition-normal)",
-            }}
-          />
-        ))}
+        Close your eyes
+      </p>
+      <div
+        style={{
+          fontSize: "var(--font-size-3xl)",
+          color: "var(--color-accent)",
+          fontFamily: "var(--font-body)",
+          fontWeight: 300,
+        }}
+      >
+        {countdown}
       </div>
     </div>
   );

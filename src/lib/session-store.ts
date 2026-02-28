@@ -7,8 +7,10 @@
 
 import type { StoryState } from "./types/story-state";
 import type { ChoicePromptPayload } from "./types/llm";
+import type { StoryId } from "./config-loader";
 
 export interface SessionData {
+  storyId: StoryId;
   state: StoryState;
   pendingChoice: ChoicePromptPayload | null;
   pendingSoundCues: Array<{ soundId: string; position: number }>;
@@ -36,9 +38,10 @@ export function getSession(conversationId: string): SessionData | undefined {
   return session;
 }
 
-export function createSession(conversationId: string, initialState: StoryState): SessionData {
+export function createSession(conversationId: string, initialState: StoryState, storyId: StoryId = "the-last-session"): SessionData {
   evictStale();
   const session: SessionData = {
+    storyId,
     state: initialState,
     pendingChoice: null,
     pendingSoundCues: [],

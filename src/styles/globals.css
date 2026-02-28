@@ -24,14 +24,40 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Breathing animation for game session */
+/* Breathing animation for game session — phase-aware variants */
 @keyframes breathe {
   0%, 100% { opacity: 0.3; }
   50% { opacity: 0.6; }
 }
 
+/* Phase 0-1: Calm, slow breathing (default) */
 .breathe {
   animation: breathe 4s ease-in-out infinite;
+}
+
+/* Phase 2: Slightly faster — unease creeping in */
+.breathe-phase2 {
+  animation: breathe 3.2s ease-in-out infinite;
+}
+
+/* Phase 3: Tension — noticeably faster, higher max opacity */
+@keyframes breathe-tense {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 0.75; }
+}
+
+.breathe-phase3 {
+  animation: breathe-tense 2.5s ease-in-out infinite;
+}
+
+/* Phase 4+: Dread — slow, deep, barely visible pulsing */
+@keyframes breathe-dread {
+  0%, 100% { opacity: 0.1; }
+  50% { opacity: 0.4; }
+}
+
+.breathe-phase4 {
+  animation: breathe-dread 6s ease-in-out infinite;
 }
 
 /* Pulse animation for when Elara is speaking */
@@ -42,6 +68,17 @@ body {
 
 .pulse {
   animation: pulse 1.2s ease-in-out infinite;
+}
+
+/* AtmosphereLayer — fog drift keyframes */
+@keyframes atmosphereDrift1 {
+  0% { transform: translate(0%, 0%) rotate(0deg); }
+  100% { transform: translate(8%, -5%) rotate(2deg); }
+}
+
+@keyframes atmosphereDrift2 {
+  0% { transform: translate(0%, 0%) rotate(0deg); }
+  100% { transform: translate(-6%, 4%) rotate(-1.5deg); }
 }
 
 /* Fade transitions */

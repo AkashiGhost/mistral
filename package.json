@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "generate-sounds": "npx tsx scripts/generate-sounds.ts"
   },
   "dependencies": {
     "@elevenlabs/react": "^0.14.1",

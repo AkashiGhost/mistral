@@ -1,0 +1,620 @@
+# =============================================================================
+# cue-map.yaml — Room 4B
+# Sound asset registry: every audio cue used in the game.
+#
+# STRUCTURE:
+#   ambient      — looping background sounds managed by the ambient engine
+#   intermittent — non-looping sounds played on a timer with variance
+#   transitions  — one-shot stop/fade events for ambient removal sequence
+#   atmospheric  — drones added as tension builds in Phase 3+
+#   endings      — sounds used exclusively in Phase 5 resolution variants
+#
+# DESIGN PRINCIPLE:
+#   "Subtractive institutional horror — a building going quiet around you."
+#   The hospital starts full of the sounds a building makes when it is alive:
+#   fluorescents, ventilation, distant elevator, pipes. Each phase removes
+#   sounds until only the player's footsteps and breathing remain. The horror
+#   is not in what is added — it is in what was always there and is now gone.
+#
+# ASSET GENERATION:
+#   - Ambient loops -> ElevenLabs SFX (30s, native loop toggle)
+#   - Drones/sustained tones -> Stable Audio 2.5 via fal.ai (up to 3 min)
+#   - Quick SFX prototyping -> CassetteAI via fal.ai (~1s generation)
+#   - All paths are relative to the game assets root
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# AMBIENT — Loop-based background sounds present at game start.
+# These establish the "alive hospital" that will be systematically killed.
+# The pipeline starts all of these immediately at game init (time 0:00).
+# ---------------------------------------------------------------------------
+
+ambient:
+
+  fluorescent_buzz:
+    name: "Fluorescent tube hum"
+    description: >
+      The persistent electrical hum of aging fluorescent tube lighting running
+      the full length of every hallway. 50-60 Hz fundamental with 120 Hz harmonics
+      from the ballast. Slightly different pitch per floor — the 4th floor is
+      noticeably sharper, as if the ballasts are older or failing. This sound is
+      the hospital's heartbeat. It is the last sound the player should consciously
+      associate with "normal building." Its removal on the 2nd floor in Phase 3
+      leaves only footsteps and ventilation — the building's nervous system
+      shutting down. Players will not consciously register it until it is gone.
+      When it disappears, the hallway feels darker even though nothing visible changed.
+    asset_path: "assets/audio/fluorescent-buzz-hospital.mp3"
+    generation_prompt: "Fluorescent tube lighting hum, hospital hallway, 50-60Hz electrical buzz with slight ballast whine, clinical institutional, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.18
+    loop: true
+    spatial:
+      pan: 0.0     # Omnidirectional — comes from the ceiling everywhere
+    fade_in_seconds: 0   # Present immediately from first frame
+    fade_out_seconds: 5  # Phase 3 removal — gradual, floor by floor
+    persists_through: "Phases 1-2, removed on 2nd floor in Phase 3"
+    tag: null
+
+  footsteps_echo:
+    name: "Player footsteps on linoleum"
+    description: >
+      The player's own footsteps echoing off linoleum floors and hard walls.
+      The echo characteristics change per floor — 1st floor lobby has shorter
+      reverb (carpet patches), upper floors have longer reverb (bare linoleum,
+      empty rooms acting as resonance chambers). The footsteps are the player's
+      primary spatial anchor: they prove the player is real, the floor is real,
+      the building has dimensions. In Phase 4 (basement), the footsteps gain
+      an additional echo — as if the hallway is longer than it should be.
+      The footsteps never stop. They are the only ambient sound that persists
+      through the entire experience. Even in the endings, the player is walking.
+    asset_path: "assets/audio/footsteps-linoleum-hospital.mp3"
+    generation_prompt: "Footsteps on hospital linoleum floor, slow walking pace, echoing empty hallway, rubber sole shoes, institutional reverb, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.22
+    loop: true
+    spatial:
+      pan: 0.0     # Centered — the player's own feet
+    fade_in_seconds: 0
+    fade_out_seconds: 0  # Never fades — always present
+    persists_through: "all phases — the player is always walking"
+    tag: null
+
+  ventilation:
+    name: "Hospital ventilation system"
+    description: >
+      Central air system cycling through the building's ductwork. A low,
+      rhythmic push-pull of air — not a constant hum like HVAC but a breathing
+      pattern: 4 seconds of airflow, 1 second of relative quiet, 4 seconds
+      of airflow. This breathing rhythm is deliberately chosen because by
+      Phase 4, when all other sounds are gone, the ventilation will sound
+      exactly like someone breathing in the hallway with the player. The
+      ventilation gets louder on the 4th floor in Phase 2 — the silence left
+      by other sounds disappearing makes the ventilation fill the space.
+      In Phase 3, the ventilation shifts from "mechanical breathing" to
+      something the player can no longer distinguish from actual breathing.
+    asset_path: "assets/audio/hospital-ventilation-rhythmic.mp3"
+    generation_prompt: "Hospital ventilation system, rhythmic airflow through ductwork, 4-second push-pull breathing pattern, institutional, slightly resonant, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.12
+    loop: true
+    spatial:
+      pan: 0.0     # Omnidirectional — ductwork is everywhere
+    fade_in_seconds: 0
+    fade_out_seconds: 6  # Long fade — becomes ambiguous whether it stopped or just became breathing
+    persists_through: "Phases 1-3, transforms in Phase 4 into perceived breathing"
+    design_note: >
+      The 4-1 breathing rhythm must be consistent so that the player's
+      subconscious syncs to it. When it stops in Phase 4, the player
+      may unconsciously hold their breath.
+    tag: null
+
+  distant_elevator:
+    name: "Distant elevator machinery"
+    description: >
+      The service elevator's motor and cable system, heard from a distance.
+      A low mechanical groan every ~60 seconds, lasting 8-10 seconds — the
+      sound of the elevator moving between floors. In Phase 1, this is
+      background building life. In Phase 2, the elevator arrives at the
+      player's floor unprompted. The distant machinery sound stops after
+      Phase 2 — replaced by the close-proximity elevator_arrive sound.
+      The distant version means "the elevator is somewhere else in the
+      building." Its removal means "the elevator is here, on your floor,
+      waiting for you specifically."
+    asset_path: "assets/audio/elevator-machinery-distant.mp3"
+    generation_prompt: "Distant elevator machinery, cable and motor, old hospital service elevator, mechanical groan through floors, muffled, intermittent"
+    generation_tool: elevenlabs_sfx
+    volume: 0.08
+    loop: false
+    spatial:
+      pan: 0.15    # Slightly right — elevator shaft is in the east wing
+    playback_interval_seconds: 60
+    playback_interval_variance_seconds: 25
+    fade_in_seconds: 1
+    fade_out_seconds: 3
+    removes_at: "Phase 2 / 3:30 — elevator arrives at player's floor"
+    tag: null
+
+# ---------------------------------------------------------------------------
+# INTERMITTENT — Non-looping sounds played at irregular intervals.
+# These simulate a building with internal processes. Pipes, doors, phones.
+# Their disappearance signals that the building's systems are shutting down
+# — or that the building is no longer pretending to be a building.
+# ---------------------------------------------------------------------------
+
+intermittent:
+
+  door_creak:
+    name: "Door creak — slow, heavy"
+    description: >
+      A heavy institutional door settling on its hinges. Not a horror-movie
+      creak — a real sound, the kind a fire door makes when air pressure
+      changes in the hallway. Played reactively when the player approaches
+      or opens a door, and occasionally on the timeline in Phase 2 when
+      doors on the 4th floor are opening by themselves. The creak is long
+      (2-3 seconds) and low-pitched. It sounds like the building stretching.
+    asset_path: "assets/audio/door-creak-heavy-institutional.mp3"
+    generation_prompt: "Heavy institutional door creak, slow, low-pitched, fire door on hydraulic hinge, hospital corridor, settling sound, not horror cliche"
+    generation_tool: elevenlabs_sfx
+    volume: 0.25
+    loop: false
+    spatial:
+      pan: 0.0     # Direction set dynamically by engine based on door location
+    fade_in_seconds: 0
+    fade_out_seconds: 0.5
+    tag: "[door_creak]"
+
+  pipe_groan:
+    name: "Pipe groan in walls"
+    description: >
+      Metal pipes expanding or contracting inside the walls. A deep, resonant
+      groan that lasts 1-2 seconds. In a functioning hospital, this would be
+      hot water or steam in the heating system. In a decommissioned hospital,
+      there is no hot water. The pipes should not be making this sound.
+      Used primarily in Phase 3 on the 2nd floor where the floor is damp.
+      The implication: something is flowing through the pipes. The narrator
+      does not comment on the impossibility. It simply notes the sound.
+    asset_path: "assets/audio/pipe-groan-metal-wall.mp3"
+    generation_prompt: "Metal pipe groaning inside wall, thermal expansion sound, resonant low frequency, hospital plumbing, 1-2 seconds, institutional"
+    generation_tool: elevenlabs_sfx
+    volume: 0.15
+    loop: false
+    spatial:
+      pan: -0.2    # Left — pipes run along the left wall
+    fade_in_seconds: 0
+    fade_out_seconds: 0
+    tag: "[pipe_groan]"
+
+  phone_ring:
+    name: "Distant phone ring"
+    description: >
+      A phone ringing somewhere in the building. An old analog ring — not
+      electronic, but a physical bell being struck by a mechanical arm.
+      This sound is never explained. It rings 3 times, then stops. It is
+      heard once in Phase 2 (from a floor below) and once in Phase 3
+      (from the same floor as the player). The phone has been disconnected.
+      All phones in the building have been disconnected. The narrator does
+      not acknowledge this contradiction. It describes the sound. The player
+      decides what it means.
+    asset_path: "assets/audio/phone-ring-analog-hospital.mp3"
+    generation_prompt: "Old analog telephone ringing, mechanical bell, hospital desk phone, 3 rings then silence, slightly muffled through walls, institutional"
+    generation_tool: elevenlabs_sfx
+    volume: 0.18
+    loop: false
+    spatial:
+      pan: 0.3     # Right — phone is down the hallway
+    fade_in_seconds: 0
+    fade_out_seconds: 0
+    tag: "[phone_ring]"
+    design_note: >
+      The phone ring is the single most unnerving intermittent sound in the
+      experience — not because it is loud or sudden, but because the building
+      has no active phone lines. Its explanation is silence.
+
+# ---------------------------------------------------------------------------
+# TRANSITIONS — One-shot events that control the removal of ambient sounds.
+# These are referenced by the timeline but defined here for asset registry.
+# They are gain automation events, not independent sound assets.
+# ---------------------------------------------------------------------------
+
+transitions:
+
+  ventilation_stop:
+    name: "Ventilation silence transition"
+    description: >
+      The ventilation system's breathing rhythm fades out over 6 seconds.
+      The long fade is deliberate — it should be ambiguous whether the
+      ventilation actually stopped or whether the player simply stopped
+      hearing it. The 4-1 breathing pattern becomes 4-2, then 4-3, then
+      silence. The breathing is gone. Or it isn't. The player is now
+      unsure whether the building was breathing or they were.
+    asset_path: null   # No separate asset — gain event on ventilation channel
+    volume: 0.0        # Target volume (fade to zero)
+    loop: false
+    fade_duration_seconds: 6
+    trigger_type: gain_automation
+    target_channel: ventilation
+    triggered_at: "3:00"
+
+  elevator_stop:
+    name: "Distant elevator silence"
+    description: >
+      The distant elevator machinery stops. Unlike ventilation, this is
+      not ambiguous — the elevator has simply stopped moving in the distance.
+      It has arrived. The 3-second fade mimics the motor winding down after
+      the car reaches its destination. After this, the elevator is no longer
+      distant. It is on the player's floor. Close.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 3
+    trigger_type: gain_automation
+    target_channel: distant_elevator
+    triggered_at: "3:30"
+
+  fluorescent_flicker:
+    name: "Fluorescent flicker event"
+    description: >
+      The fluorescent buzz drops to zero for 0.3 seconds, returns at 80%
+      for 0.5 seconds, drops again for 0.1 seconds, then returns to normal.
+      This is a reactive event triggered by the narrator when describing
+      lights behaving abnormally. It is NOT a removal — it is a momentary
+      interruption that resolves. The player's brain registers "the lights
+      almost went out" rather than "the lights went out." The almost is worse.
+    asset_path: null
+    volume: null       # Pattern-based volume automation
+    loop: false
+    trigger_type: volume_pattern
+    volume_pattern:
+      - { time_offset: 0.0, volume: 0.0 }
+      - { time_offset: 0.3, volume: 0.14 }  # 80% of normal 0.18
+      - { time_offset: 0.8, volume: 0.0 }
+      - { time_offset: 0.9, volume: 0.18 }  # Back to normal
+    target_channel: fluorescent_buzz
+    tag: "[fluorescent_flicker]"
+
+  fluorescent_off:
+    name: "Fluorescent lights off — permanent"
+    description: >
+      Fluorescent buzz fades to zero over 5 seconds on the lower floors.
+      This is a permanent removal for the 2nd floor and below. The 5-second
+      fade is floor-by-floor — each floor's lights fail slightly before
+      the player reaches the next one. The darkness arrives before the player.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 5
+    trigger_type: gain_automation
+    target_channel: fluorescent_buzz
+    triggered_at: "4:30"
+
+  silence_full:
+    name: "Full silence — pre-revelation"
+    description: >
+      All active sounds muted simultaneously over 0.3 seconds before the
+      revelation moment in Phase 4. This is faster than The Last Session's
+      0.5s mute because the hospital experience has already stripped most
+      sounds — this is the final cut. After this, 2 seconds of absolute
+      silence. Then the heartbeat. Then the revelation.
+    asset_path: null
+    volume: 0.0
+    loop: false
+    fade_duration_seconds: 0.3
+    trigger_type: mute_all
+    triggered_at: "7:30"
+
+# ---------------------------------------------------------------------------
+# ATMOSPHERIC — Drones and tones that are ADDED as tension builds.
+# These are additive horror — they creep in under the remaining sounds.
+# The player should not be able to name when they started.
+# ---------------------------------------------------------------------------
+
+atmospheric:
+
+  hospital_drone:
+    name: "Building structural resonance"
+    description: >
+      A deep, tonal drone that sounds like the building itself resonating
+      at its fundamental frequency. Every large structure has one — a sub-audible
+      hum created by wind load, structural flex, and HVAC resonance. In a
+      functioning hospital, this is masked by equipment noise. In a silent,
+      decommissioned hospital, it becomes the dominant low-frequency sound.
+      It is the building's voice. Introduced at 4:00 with a 10-second fade.
+      At 0.1 volume, it is felt rather than heard — a pressure in the chest,
+      a weight in the air. The building is aware of the player. This drone
+      is how it sounds when it is paying attention.
+    asset_path: "assets/audio/building-structural-drone.mp3"
+    generation_prompt: "Deep building resonance drone, structural frequency, 30-40Hz, hospital architecture, ominous, imperceptible onset, seamless loop"
+    generation_tool: stable_audio_2
+    volume: 0.1
+    loop: true
+    spatial:
+      pan: 0.0     # Omnidirectional — the building itself
+    fade_in_seconds: 10
+    introduced_at: "Phase 2 / 4:00"
+    tag: null
+
+  sub_bass:
+    name: "Sub-bass pressure"
+    description: >
+      15-25 Hz infrasound. Below conscious hearing threshold. Creates
+      physiological anxiety: increased heart rate, peripheral vision
+      disturbance, the feeling of being watched. At 0.06 volume, the
+      player cannot name this sensation. They feel wrong. The source
+      is the building — or more precisely, the space between the walls.
+      Introduced in Phase 4 alongside the heartbeat. The combination of
+      sub_bass + heartbeat creates a physical sensation of being inside
+      something alive.
+    asset_path: "assets/audio/sub-bass-infrasound.mp3"
+    generation_prompt: "Deep infrasound sub-bass 15-25Hz, barely audible pressure wave, horror atmosphere, physiological unease, seamless loop"
+    generation_tool: stable_audio_2
+    volume: 0.06    # Below conscious threshold — felt not heard
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 8
+    introduced_at: "Phase 4 / 6:00"
+    design_note: "Volume intentionally near-inaudible. Raising it defeats the purpose."
+    tag: null
+
+  heartbeat:
+    name: "Heartbeat — 40 BPM, not the player's"
+    description: >
+      A slow, low-frequency heartbeat at 40 BPM — significantly slower than
+      a healthy resting heart rate (60-100 BPM). The slowness is what makes
+      it wrong. This is not the player's heartbeat. It is too slow, too
+      regular, too mechanical. It sounds like a heart that has been beating
+      for much longer than a human heart should. Introduced at 6:30 in
+      Phase 4, it becomes the dominant rhythmic sound once the player
+      enters the basement hallway. The heartbeat source appears to come
+      from the room at the end of the corridor — from the bed.
+    asset_path: "assets/audio/heartbeat-slow-40bpm.mp3"
+    generation_prompt: "Slow heartbeat 40 BPM, low frequency, mechanical precision, unnaturally slow, hospital cardiac monitor feel, slightly muffled, seamless loop"
+    generation_tool: stable_audio_2
+    volume: 0.25
+    loop: true
+    spatial:
+      pan: 0.0     # Center initially — shifts to match room location as player approaches
+    fade_in_seconds: 6
+    introduced_at: "Phase 4 / 6:30"
+    design_note: >
+      40 BPM is chosen because it sits in the uncanny valley of heartbeats.
+      Slow enough that the player's own heart does not sync to it. Fast enough
+      that it is unmistakably a heartbeat and not just a rhythmic thump.
+      The player's body rejects the rhythm — this creates physical unease.
+    tag: null
+
+# ---------------------------------------------------------------------------
+# ENDINGS — Sounds used exclusively in Phase 5 (8:00-10:00).
+# Each ending variant receives a unique sound signature.
+#
+# FOUR ENDINGS:
+#   integration    — The player signs the chart. The hospital is theirs.
+#   consumption    — The player wakes up in the bed. Loop.
+#   release        — The hospital lets the player go. Dawn.
+#   dissolution    — The hallways keep going. No resolution.
+#
+# Sound design principle: each ending's audio must be emotionally conclusive.
+# The hospital's sonic character in the ending tells the player what kind of
+# story they just experienced: institutional acceptance, institutional loop,
+# institutional release, or institutional infinity.
+# ---------------------------------------------------------------------------
+
+endings:
+
+  morning_light:
+    name: "Morning ambient — hospital daytime"
+    description: >
+      The sound of a hospital waking up. Distant voices (indistinct, no words),
+      the rumble of a laundry cart, a PA system chime. This is St. Maren's
+      as it was when it was alive — or as the player imagines it was.
+      Used in the consumption ending (the loop), where the player wakes up
+      in the bed and discovers they are the patient. The morning sounds are
+      aggressively normal — the horror is that normalcy is the prison.
+      Also used in the release ending, but at lower volume and with a colder,
+      more distant EQ — the morning is outside, not inside.
+    asset_path: "assets/audio/hospital-morning-ambient.mp3"
+    generation_prompt: "Hospital morning ambient, distant voices, laundry cart rumble, PA chime, institutional waking up, warm but clinical, seamless loop"
+    generation_tool: elevenlabs_sfx
+    volume: 0.35
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 3
+    used_in_endings: [consumption, release]
+    tag: null
+
+  fluorescent_restore:
+    name: "Fluorescent lights returning"
+    description: >
+      All fluorescent tubes on all floors returning to full buzz simultaneously.
+      This is not a flicker — it is a full restoration. The ballast whine rises
+      from silence to full volume over 2 seconds. The building is lit again.
+      Used in the integration ending, where the player accepts the hospital
+      as theirs. The restoration of light is the restoration of ownership.
+      The buzz is the same pitch as Phase 1 — the player is back where they
+      started, but the meaning has changed.
+    asset_path: "assets/audio/fluorescent-buzz-hospital.mp3"  # Same asset as baseline
+    generation_prompt: null  # Reuses existing asset
+    volume: 0.22   # Slightly louder than Phase 1 baseline (0.18) — more present
+    loop: true
+    spatial:
+      pan: 0.0
+    fade_in_seconds: 2
+    used_in_endings: [integration]
+    design_note: >
+      The slightly higher volume (0.22 vs 0.18) is intentional. The lights
+      are the same but the player is different. They notice them now.
+    tag: null
+
+  all_sounds_return:
+    name: "All original ambient sounds simultaneous return"
+    description: >
+      In the dissolution ending, every ambient sound that was removed during
+      Phases 2-4 returns SIMULTANEOUSLY: fluorescent_buzz, footsteps_echo
+      (already present), ventilation, distant_elevator — all at once, at or
+      above their original volumes. After 6+ minutes of progressive silence,
+      this is overwhelming. The building is alive again. It was always alive.
+      The player is inside something that has no intention of stopping.
+      Unlike The Last Session's dissolution (which fades to nothing), Room 4B's
+      dissolution does NOT fade. The sounds hold. The building continues.
+      The player is still walking. The sounds confirm this.
+    asset_path: null  # Orchestrated event — re-activates existing channels
+    volume: null      # Each channel returns to its baseline volume
+    loop: false       # The channels themselves loop; this is a re-activation event
+    trigger_type: restore_all_channels
+    target_channels: [fluorescent_buzz, footsteps_echo, ventilation, distant_elevator]
+    restore_volumes:
+      fluorescent_buzz: 0.18
+      footsteps_echo: 0.22
+      ventilation: 0.12
+      distant_elevator: 0.08
+    fade_in_seconds: 2
+    used_in_endings: [dissolution, release]
+    tag: null
+
+  breath_close:
+    name: "Close breathing — single exhale"
+    description: >
+      A single close exhale — not the player's. Someone else. Close enough
+      to feel on skin. Used reactively in Phase 4 when the player stands
+      next to the bed. Not looped. One exhale. Then nothing. The player
+      decides whether they heard it. The narrator does not confirm.
+    asset_path: "assets/audio/breath-close-exhale.mp3"
+    generation_prompt: "Single close exhale, human breath, very close proximity, intimate, slightly warm, hospital room acoustic, not whisper, just breath"
+    generation_tool: elevenlabs_sfx
+    volume: 0.4
+    loop: false
+    spatial:
+      pan: 0.1     # Slightly right — from the bed
+    fade_in_seconds: 0
+    fade_out_seconds: 1.5
+    used_in_endings: []  # Phase 4 reactive only
+    tag: "[breath_close]"
+
+  elevator_arrive:
+    name: "Elevator arriving at player's floor"
+    description: >
+      The service elevator arriving close — not distant machinery but the
+      immediate mechanical sound of doors opening on the player's floor.
+      Cable tension release, hydraulic brake, the double-clunk of doors
+      parting. This is close. This is for the player. No one pressed the
+      button. Used in Phase 2 (the elevator arrives at the 4th floor
+      unbidden) and Phase 3 (the elevator follows the player floor to floor).
+    asset_path: "assets/audio/elevator-arrive-close.mp3"
+    generation_prompt: "Hospital service elevator arriving, close proximity, cable tension release, hydraulic brake, doors opening, institutional mechanical, single event"
+    generation_tool: elevenlabs_sfx
+    volume: 0.35
+    loop: false
+    spatial:
+      pan: 0.2     # Slightly right — east wing
+    fade_in_seconds: 0
+    fade_out_seconds: 0
+    tag: "[elevator_arrive]"
+
+  door_check:
+    name: "Testing a locked door handle"
+    description: >
+      The sound of testing a commercial door handle — the lever depresses,
+      meets resistance, returns. A quick, functional sound. Used throughout
+      Phase 1 as the player checks each door on their route. Mechanical.
+      Satisfying. Normal. The sound of a building that works as designed.
+    asset_path: "assets/audio/door-handle-check-locked.mp3"
+    generation_prompt: "Commercial door handle test, lever press and release, locked resistance, institutional hardware, quick mechanical click, hospital corridor"
+    generation_tool: elevenlabs_sfx
+    volume: 0.3
+    loop: false
+    spatial:
+      pan: 0.0
+    tag: "[door_check]"
+
+  clipboard_mark:
+    name: "Pen marking clipboard"
+    description: >
+      A ballpoint pen checking a box on a clipboard. Small. Precise.
+      The satisfying scratch of ink on paper. Used in Phase 1 as the player
+      marks each door as locked. In the integration ending, this sound
+      returns when the player signs the chart — the same pen, the same
+      scratch, different meaning.
+    asset_path: "assets/audio/pen-clipboard-checkmark.mp3"
+    generation_prompt: "Ballpoint pen checking box on clipboard, paper scratch, quick precise mark, close proximity, slightly percussive"
+    generation_tool: elevenlabs_sfx
+    volume: 0.25
+    loop: false
+    spatial:
+      pan: 0.0     # In the player's hands
+    tag: "[clipboard_mark]"
+
+# ---------------------------------------------------------------------------
+# MIXING — Web Audio API routing and ducking configuration.
+# These are not sound assets but runtime audio graph parameters.
+# ---------------------------------------------------------------------------
+
+mixing:
+  # TTS ducking: when narrator speaks, reduce ambient volume so narration is clear.
+  # -8dB is slightly more aggressive than The Last Session (-6dB) because the
+  # hospital ambient sounds have more broadband frequency content that would
+  # compete with a narrator voice.
+  tts_ducking:
+    ambient_reduction_db: -8
+    fade_in_duration_ms: 200   # Faster duck — narrator is impersonal, no warmth needed
+    fade_out_duration_ms: 500  # Ambient returns after narrator finishes
+    design_note: >
+      The faster duck (200ms vs 300ms in The Last Session) matches the narrator's
+      clinical tone. There is no warm conversational overlap — the narrator speaks,
+      then stops. The ambient returns. The building fills the gap.
+
+  # Default crossfade for all other transitions not explicitly specified
+  crossfade_default_ms: 1500
+
+  # Spatial positioning summary (for Web Audio API PannerNode configuration)
+  # All panning values are -1.0 (full left) to +1.0 (full right)
+  spatial_map:
+    fluorescent_buzz:
+      pan: 0.0
+      notes: "Ceiling-mounted. Omnidirectional. The building's electrical nervous system."
+    footsteps_echo:
+      pan: 0.0
+      notes: "Centered — the player's own feet. Echo characteristics change per floor."
+    ventilation:
+      pan: 0.0
+      notes: "Omnidirectional ductwork. Breathing pattern becomes ambiguous in Phase 3-4."
+    distant_elevator:
+      pan: 0.15
+      notes: "Slightly right — elevator shaft is in the east wing."
+    hospital_drone:
+      pan: 0.0
+      notes: "The building itself. No directional source."
+    sub_bass:
+      pan: 0.0
+      notes: "Omnidirectional by physics at 15-25Hz. No meaningful spatial position."
+    heartbeat:
+      pan: 0.0
+      notes: "Center initially. If engine supports dynamic panning, shift toward room door in Phase 4."
+    door_creak:
+      pan: 0.0
+      notes: "Dynamic — engine sets based on which door is being described."
+    pipe_groan:
+      pan: -0.2
+      notes: "Left wall — pipes run along the corridor's left side."
+    phone_ring:
+      pan: 0.3
+      notes: "Down the hallway to the right. Distance implies the next wing."
+
+  # Preload priority: load these during visual onboarding screen, before game starts.
+  # Order is priority (first = most critical to have ready).
+  preload_order:
+    - assets/audio/fluorescent-buzz-hospital.mp3      # Needed at second 0
+    - assets/audio/footsteps-linoleum-hospital.mp3     # Needed at second 0
+    - assets/audio/hospital-ventilation-rhythmic.mp3   # Needed at second 0
+    - assets/audio/elevator-machinery-distant.mp3      # Needed at second 15
+    - assets/audio/door-handle-check-locked.mp3        # Needed at second 15
+    - assets/audio/pen-clipboard-checkmark.mp3         # Needed at second 15
+    - assets/audio/door-creak-heavy-institutional.mp3  # Needed by minute 2
+    - assets/audio/elevator-arrive-close.mp3           # Needed by minute 2
+    - assets/audio/building-structural-drone.mp3       # Needed by minute 4
+    - assets/audio/pipe-groan-metal-wall.mp3           # Needed by minute 4
+    - assets/audio/phone-ring-analog-hospital.mp3      # Needed by minute 4
+    - assets/audio/sub-bass-infrasound.mp3             # Needed by minute 6
+    - assets/audio/heartbeat-slow-40bpm.mp3            # Needed by minute 6
+    - assets/audio/breath-close-exhale.mp3             # Needed by minute 7
+    - assets/audio/hospital-morning-ambient.mp3        # Needed by minute 8

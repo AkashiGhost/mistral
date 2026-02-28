@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getGameConfig } from "@/lib/config-loader";
+import { getGameConfig, type StoryId } from "@/lib/config-loader";
 import {
   getSession,
   createSession,
@@ -26,11 +26,9 @@ import type { GameConfig, Beat, ChoiceOption } from "@/lib/types/game-config";
 // Must be Node.js runtime — Edge does not support module-level Map persistence
 export const runtime = "nodejs";
 
-// Cache story config across requests (loaded once per warm instance)
-let storyConfig: GameConfig | null = null;
-function getConfig(): GameConfig {
-  if (!storyConfig) storyConfig = getGameConfig();
-  return storyConfig;
+// Story configs are cached inside getGameConfig() per storyId
+function getConfig(storyId?: StoryId): GameConfig {
+  return getGameConfig(storyId);
 }
 
 const intentParser = new MistralIntentParser(process.env.MISTRAL_API_KEY!);
@@ -94,14 +92,17 @@ export async function POST(req: NextRequest) {
       console.log(`[WEBHOOK] No conversation_id found — generated from first user message: ${conversation_id}`);
     }
 
-    const config = getConfig();
+    // Determine story ID — from existing session or from request metadata
+    const requestStoryId = (body.elevenlabs_extra_body?.story_id as StoryId | undefined) ?? "the-last-session";
 
     // Get or init session state
     let session = getSession(conversation_id);
     const sessionWasNew = !session;
+    const storyId = session?.storyId ?? requestStoryId;
+    const config = getConfig(storyId);
     if (!session) {
       const initialState = initState(config);
-      session = createSession(conversation_id, initialState);
+      session = createSession(conversation_id, initialState, storyId);
     }
     console.log(
       `[WEBHOOK] Session: ${sessionWasNew ? "created" : "found"}, conversationId=${conversation_id}, gameOver=${session.gameOver}, phase=${session.state.currentPhaseIndex}, beat=${session.state.currentBeatIndex}`,
@@ -117,10 +118,16 @@ export async function POST(req: NextRequest) {
     const playerText = String(userMessages[userMessages.length - 1]?.content ?? "").trim();
     console.log(`[WEBHOOK] Player said: "${playerText.slice(0, 100)}${playerText.length > 100 ? "..." : ""}"`);
 
+    // ── Detect silence auto-advance (sent by client after 8s of silence) ──
+    const isSilenceNudge = playerText === "[silence]";
+    if (isSilenceNudge) {
+      console.log(`[WEBHOOK] Silence nudge detected — AI will continue narrating`);
+    }
+
     // ── If there's a pending voice choice, match the player's response ──
     let { state } = session;
     const currentPendingChoice = session.pendingChoice;
-    if (currentPendingChoice && playerText) {
+    if (currentPendingChoice && playerText && !isSilenceNudge) {
       const choiceOptions = currentPendingChoice.options;
       const matchedOption = choiceOptions.find((opt) => {
         const words = opt.label.toLowerCase().split(/\s+/);
@@ -153,6 +160,11 @@ export async function POST(req: NextRequest) {
     const currentBeat = getCurrentBeat(config, state);
 
     let { systemPrompt } = buildContext(config, state, currentPhase, currentBeat);
+
+    // ── Silence nudge: tell the AI to continue narrating ──────────
+    if (isSilenceNudge) {
+      systemPrompt += "\n\n[SILENCE] The player has been silent. Continue the story naturally — advance the scene, describe what happens next, or deepen the atmosphere. Do not ask if the player is still there.";
+    }
 
     // ── If a voice choice is pending, inject directive into system prompt ──
     // This happens when the previous turn detected a choice beat. Elara
@@ -207,6 +219,10 @@ export async function POST(req: NextRequest) {
           let firstChunkTime: number | null = null;
           let chunkCount = 0;
 
+          // Regex to strip [SOUND:x] markers before sending to ElevenLabs TTS.
+          // Markers are collected from fullText post-stream for game state updates.
+          const soundCueRe = /\[SOUND:[a-z_]+\]\s*/gi;
+
           for await (const chunk of streamMistralStory(
             process.env.MISTRAL_API_KEY!,
             mistralMessages,
@@ -218,6 +234,13 @@ export async function POST(req: NextRequest) {
             fullText += chunk;
             chunkCount++;
 
+            // Strip [SOUND:x] markers so ElevenLabs doesn't speak them aloud
+            const cleanChunk = chunk.replace(soundCueRe, "");
+            if (!cleanChunk) {
+              first = false;
+              continue; // chunk was entirely a sound marker — skip SSE emit
+            }
+
             const data = {
               id: sseId,
               object: "chat.completion.chunk",
@@ -226,8 +249,8 @@ export async function POST(req: NextRequest) {
               choices: [{
                 index: 0,
                 delta: first
-                  ? { role: "assistant" as const, content: chunk }
-                  : { content: chunk },
+                  ? { role: "assistant" as const, content: cleanChunk }
+                  : { content: cleanChunk },
                 finish_reason: null,
               }],
             };
