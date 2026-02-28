@@ -84,7 +84,16 @@ export async function POST(req: NextRequest) {
   const resolvedStoryId = storyId ?? "the-last-session";
   console.log(`[GAME-STATE] POST init for cid=${conversationId}, storyId=${resolvedStoryId}`);
 
-  const config = getGameConfig(resolvedStoryId);
+  let config;
+  try {
+    config = getGameConfig(resolvedStoryId);
+  } catch (err) {
+    console.error(`[GAME-STATE] Failed to load story "${resolvedStoryId}":`, err);
+    return NextResponse.json(
+      { error: `Story "${resolvedStoryId}" not found or failed to load` },
+      { status: 404 },
+    );
+  }
   const existingSession = getSession(conversationId);
 
   if (!existingSession) {

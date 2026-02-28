@@ -99,7 +99,13 @@ export async function POST(req: NextRequest) {
     let session = getSession(conversation_id);
     const sessionWasNew = !session;
     const storyId = session?.storyId ?? requestStoryId;
-    const config = getConfig(storyId);
+    let config: GameConfig;
+    try {
+      config = getConfig(storyId);
+    } catch (cfgErr) {
+      console.error(`[WEBHOOK] Failed to load story "${storyId}":`, cfgErr);
+      return openAiSSEResponse("I'm sorry, I cannot find that story right now. Please try again.");
+    }
     if (!session) {
       const initialState = initState(config);
       session = createSession(conversation_id, initialState, storyId);
