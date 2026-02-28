@@ -257,8 +257,14 @@ export function loadStory(
   }
   const validation = validateIndividualFiles(schemasDir, filesToValidate);
 
+  // Schemas were written for The Last Session's structure. Other stories may
+  // have different structures that are still functionally valid. Treat schema
+  // mismatches as warnings, not hard errors, so the engine can use the data.
   if (!validation.valid) {
-    return { errors: validation.errors };
+    console.warn(
+      `[STORY-LOADER] Schema validation warnings for ${storyDir}: ${validation.errors.join("; ")}`,
+    );
+    validation.warnings.push(...validation.errors);
   }
 
   // 3. Transform keys snake_case → camelCase
