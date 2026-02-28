@@ -63,6 +63,8 @@ type UIAction =
 function uiReducer(state: UIState, action: UIAction): UIState {
   switch (action.type) {
     case "SET_STATUS":
+      // Don't overwrite "ended" with "idle" (ElevenLabs fires onDisconnect after game over)
+      if (state.status === "ended" && action.status === "idle") return state;
       return { ...state, status: action.status };
     case "SET_CONVERSATION_ID":
       return { ...state, conversationId: action.id };
@@ -161,8 +163,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     },
     onDisconnect: () => {
       stopPolling();
-      // Only reset to idle if we haven't already ended.
-      // GAME_OVER sets status="ended" — check the current state ref to avoid overwriting it.
+      // SET_STATUS "idle" is ignored by reducer when status is already "ended"
       dispatch({ type: "SET_STATUS", status: "idle" });
     },
     onMessage: ({ message, source }: { message: string; source: string }) => {
@@ -186,6 +187,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
       const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;
       if (!agentId) {
         console.error("[GameContext] NEXT_PUBLIC_ELEVENLABS_AGENT_ID not set");
+        dispatch({ type: "SET_STATUS", status: "error" });
+        return;
+      }
+
+      // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt
+      try {
+        await navigator.mediaDevices.getUserMedia({ audio: true });
+      } catch {
+        console.error("[GameContext] Microphone permission denied");
         dispatch({ type: "SET_STATUS", status: "error" });
         return;
       }

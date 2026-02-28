@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (session.gameOver) {
-      return openAiResponse("The session has ended. Goodbye.");
+      return openAiSSEResponse("The session has ended. Goodbye.");
     }
 
     // ── Extract player's latest message ──────────────────────────
@@ -115,7 +115,7 @@ export async function POST(req: NextRequest) {
         pendingSoundCues: cues.map((c) => ({ soundId: c.soundId, position: c.position })),
         gameOver: true,
       });
-      return openAiResponse(cleanText);
+      return openAiSSEResponse(cleanText);
     }
 
     // ── Check for beat with choices — surface to client via polling ──
@@ -150,25 +150,71 @@ export async function POST(req: NextRequest) {
       ],
     });
 
-    return openAiResponse(cleanText);
+    return openAiSSEResponse(cleanText);
   } catch (err) {
     console.error("[/api/llm]", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
-function openAiResponse(content: string) {
-  return NextResponse.json({
-    id: `chatcmpl-${Date.now()}`,
-    object: "chat.completion",
-    created: Math.floor(Date.now() / 1000),
-    model: "mistral-large-latest",
-    choices: [
-      {
-        index: 0,
-        message: { role: "assistant", content },
-        finish_reason: "stop",
-      },
-    ],
+/**
+ * Return an SSE-streamed OpenAI-compatible response.
+ * ElevenLabs sends `stream: true` and expects `text/event-stream` with delta chunks.
+ * We split by sentence boundaries so ElevenLabs can start TTS before the full response arrives.
+ */
+function openAiSSEResponse(content: string): Response {
+  const encoder = new TextEncoder();
+  const id = `chatcmpl-${Date.now()}`;
+  const created = Math.floor(Date.now() / 1000);
+
+  // Split into sentence-sized chunks for progressive TTS
+  const sentences = content.match(/[^.!?]+[.!?]+[\s]*/g) ?? [content];
+
+  const stream = new ReadableStream({
+    start(controller) {
+      // First chunk includes role
+      const first = {
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model: "mistral-large-latest",
+        choices: [{ index: 0, delta: { role: "assistant", content: sentences[0] ?? "" }, finish_reason: null }],
+      };
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(first)}\n\n`));
+
+      // Remaining sentence chunks
+      for (let i = 1; i < sentences.length; i++) {
+        const chunk = {
+          id,
+          object: "chat.completion.chunk",
+          created,
+          model: "mistral-large-latest",
+          choices: [{ index: 0, delta: { content: sentences[i] }, finish_reason: null }],
+        };
+        controller.enqueue(encoder.encode(`data: ${JSON.stringify(chunk)}\n\n`));
+      }
+
+      // Finish chunk
+      const finish = {
+        id,
+        object: "chat.completion.chunk",
+        created,
+        model: "mistral-large-latest",
+        choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+      };
+      controller.enqueue(encoder.encode(`data: ${JSON.stringify(finish)}\n\n`));
+
+      // Done signal
+      controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+      controller.close();
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    },
   });
 }
