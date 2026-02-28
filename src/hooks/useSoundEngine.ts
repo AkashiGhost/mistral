@@ -37,8 +37,6 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
   "the-lighthouse": [
     // Phase 1: Storm — ocean, wind, creaking wood
     { time: 0, action: "start_ambient", soundIds: ["ocean", "wind", "creak"] },
-    // Phase 2: Radio comes alive
-    { time: 180, action: "fade_in", soundIds: ["radio_static"], fadeInSeconds: 3 },
     // Phase 2: Wind intensifies
     { time: 240, action: "volume_adjust", soundId: "wind", targetVolume: 0.8, fadeDurationSeconds: 8 },
     // Phase 3: Creaking stops (structure groans to silence)
@@ -47,8 +45,6 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
     { time: 380, action: "fade_in", soundIds: ["foghorn_drone", "sub_bass"], fadeInSeconds: 6 },
     // Phase 4: Subtractive — wind dies
     { time: 450, action: "fade_out", soundId: "wind", fadeDurationSeconds: 8 },
-    // Phase 4: Radio static fades to nothing
-    { time: 470, action: "fade_out", soundId: "radio_static", fadeDurationSeconds: 4 },
     // Phase 5: Just ocean and foghorn, fading
     { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 20 },
   ],
@@ -88,7 +84,6 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
     wind: { pan: 0.3 },
     creak: { pan: 0.1 },
     foghorn_drone: { pan: -0.2 },
-    radio_static: { pan: 0.5 },
     sub_bass: { pan: 0 },
   },
   "room-4b": {

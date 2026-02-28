@@ -64,3 +64,12 @@ Make the story upload/creation process itself feel like a game:
 - Preview snippets as you build (hear a sample narration of your opening)
 - Collaborative — AI suggests improvements, user accepts/rejects
 - Templates for common genres (horror therapy session, mystery lighthouse, etc.)
+
+## Pre-Recorded Gameplay Videos for Marketing
+Record actual gameplay sessions and publish as short-form content:
+- Instagram Reels / TikTok / YouTube Shorts — 30-60 second highlights
+- Show the experience: dark screen, ambient sounds, voice interaction, plot twist moment
+- "Watch someone discover the truth about Elara" — curiosity hook
+- Viewers think "I want to try this" — drives organic downloads/visits
+- Could also do reaction-style videos: film someone's face as they play for the first time
+- Key: capture the "wow moment" (revelation scene, unexpected AI response, genuine emotional reaction)

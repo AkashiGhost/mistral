@@ -123,7 +123,7 @@ async function generateLastSessionSounds(): Promise<SoundSet> {
 
 /** The Lighthouse — coastal storm: ocean waves, wind, creaking, foghorn drone */
 async function generateLighthouseSounds(): Promise<SoundSet> {
-  const [ocean, wind, creak, foghorn_drone, radio_static, sub_bass] =
+  const [ocean, wind, creak, foghorn_drone, sub_bass] =
     await Promise.all([
       // Ocean: lowpass noise at 800Hz — deep rumbling waves
       generateFilteredNoise(8, "lowpass", 800, 0.3, 0.2),
@@ -133,12 +133,10 @@ async function generateLighthouseSounds(): Promise<SoundSet> {
       generateFilteredNoise(4, "bandpass", 300, 5.0, 0.08),
       // Foghorn: low sawtooth drone at A1 (55Hz)
       generateDrone(55, "sawtooth", 8, 0.2),
-      // Radio static: highpass noise — crackling
-      generateFilteredNoise(6, "highpass", 3000, 0.5, 0.06),
       // Sub bass: rumbling 30Hz foundation
       generateDrone(30, "sine", 6, 0.25),
     ]);
-  return { ocean, wind, creak, foghorn_drone, radio_static, sub_bass };
+  return { ocean, wind, creak, foghorn_drone, sub_bass };
 }
 
 /** Room 4B — abandoned hospital: fluorescent hum, machinery, metallic echo, heartbeat */

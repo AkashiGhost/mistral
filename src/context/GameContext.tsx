@@ -225,55 +225,74 @@ export function GameProvider({ children }: { children: ReactNode }) {
     }
   }, [stopPolling]);
 
-  // ── ElevenLabs ConvAI hook ────────────────────────────────────
+  // ── Stable callback refs — prevents useConversation from recreating ──
+  // ElevenLabs useConversation returns a new object when callback identities
+  // change. We use refs so the identity is always stable.
+  const pollGameStateRef = useRef(pollGameState);
+  pollGameStateRef.current = pollGameState;
+  const stopPollingRef = useRef(stopPolling);
+  stopPollingRef.current = stopPolling;
+  const clearSilenceTimerRef = useRef(clearSilenceTimer);
+  clearSilenceTimerRef.current = clearSilenceTimer;
+
+  const stableOnConnect = useCallback(() => {
+    console.log("[GAME] Connected to ElevenLabs, starting poll");
+    dispatch({ type: "SET_STATUS", status: "playing" });
+    if (pollIntervalRef.current === null) {
+      pollIntervalRef.current = setInterval(() => void pollGameStateRef.current(), 3000);
+    }
+  }, []);
+
+  const stableOnDisconnect = useCallback(() => {
+    console.log("[GAME] Disconnected from ElevenLabs");
+    stopPollingRef.current();
+    clearSilenceTimerRef.current();
+    dispatch({ type: "SET_STATUS", status: "idle" });
+  }, []);
+
+  const stableOnMessage = useCallback(({ message, source }: { message: string; source: string }) => {
+    console.log(`[GAME] Message from ${source}: "${message.slice(0, 100)}${message.length > 100 ? "…" : ""}"`);
+    if (source === "ai" && message) {
+      dispatch({ type: "ELARA_TEXT", text: message });
+      void pollGameStateRef.current();
+    }
+    if (source === "user") {
+      clearSilenceTimerRef.current();
+    }
+  }, []);
+
+  const stableOnError = useCallback((message: string) => {
+    console.error("[GAME] ERROR:", message);
+    dispatch({ type: "SET_STATUS", status: "error" });
+    stopPollingRef.current();
+  }, []);
+
+  // ── onModeChange needs conversationRef, but conversationRef is defined after
+  // useConversation. We use a forward-declared ref that gets assigned below. ──
+  const conversationRef = useRef<ReturnType<typeof useConversation> | null>(null);
+
+  const stableOnModeChange = useCallback(({ mode }: { mode: string }) => {
+    console.log(`[GAME] Mode changed to: ${mode}`);
+    clearSilenceTimerRef.current();
+    if (mode === "listening") {
+      silenceTimerRef.current = setTimeout(() => {
+        console.log("[GAME] Silence timeout — auto-advancing narration");
+        conversationRef.current?.sendUserMessage("[silence]");
+      }, SILENCE_TIMEOUT_MS);
+    }
+  }, []);
+
+  // ── ElevenLabs ConvAI hook — stable callbacks prevent identity churn ──
   const conversation = useConversation({
-    onConnect: () => {
-      console.log("[GAME] Connected to ElevenLabs, starting poll");
-      dispatch({ type: "SET_STATUS", status: "playing" });
-      // Poll every 3s for choices / state events
-      if (pollIntervalRef.current === null) {
-        pollIntervalRef.current = setInterval(pollGameState, 3000);
-      }
-    },
-    onDisconnect: () => {
-      console.log("[GAME] Disconnected from ElevenLabs");
-      stopPolling();
-      clearSilenceTimer();
-      // SET_STATUS "idle" is ignored by reducer when status is already "ended"
-      dispatch({ type: "SET_STATUS", status: "idle" });
-    },
-    onMessage: ({ message, source }: { message: string; source: string }) => {
-      console.log(`[GAME] Message from ${source}: "${message.slice(0, 100)}${message.length > 100 ? "…" : ""}"`);
-      if (source === "ai" && message) {
-        dispatch({ type: "ELARA_TEXT", text: message });
-        // Immediate poll after each AI turn to pick up choices instantly
-        void pollGameState();
-      }
-      // User spoke — reset silence timer
-      if (source === "user") {
-        clearSilenceTimer();
-      }
-    },
-    onModeChange: ({ mode }: { mode: string }) => {
-      console.log(`[GAME] Mode changed to: ${mode}`);
-      // ── Auto-advance on silence ──────────────────────────────
-      // When AI finishes speaking ("listening" mode), start silence timer.
-      // If player doesn't speak within SILENCE_TIMEOUT_MS, nudge the AI
-      // to continue narrating by sending a silent user message.
-      clearSilenceTimer();
-      if (mode === "listening") {
-        silenceTimerRef.current = setTimeout(() => {
-          console.log("[GAME] Silence timeout — auto-advancing narration");
-          conversation.sendUserMessage("[silence]");
-        }, SILENCE_TIMEOUT_MS);
-      }
-    },
-    onError: (message: string) => {
-      console.error("[GAME] ERROR:", message);
-      dispatch({ type: "SET_STATUS", status: "error" });
-      stopPolling();
-    },
+    onConnect: stableOnConnect,
+    onDisconnect: stableOnDisconnect,
+    onMessage: stableOnMessage,
+    onModeChange: stableOnModeChange,
+    onError: stableOnError,
   });
+
+  // Keep ref fresh so startSession/endSession/togglePause always use current object
+  conversationRef.current = conversation;
 
   // ── Start session ─────────────────────────────────────────────
   const startSession = useCallback(async (storyId?: string, firstMessage?: string) => {
@@ -290,16 +309,22 @@ export function GameProvider({ children }: { children: ReactNode }) {
       }
       console.log(`[GAME] Starting session: agentId=${agentId}, storyId=${resolvedStoryId}`);
 
-      // Request mic permission explicitly — ElevenLabs SDK does NOT auto-prompt.
-      // IMPORTANT: Release the stream immediately so the SDK can claim the mic cleanly.
+      // Check mic permission state WITHOUT acquiring a stream.
+      // LiveKit (ElevenLabs WebRTC) handles mic acquisition internally via
+      // room.localParticipant.setMicrophoneEnabled(true).
+      // Pre-acquiring with getUserMedia() then .stop() causes a race condition
+      // on Windows Chrome — LiveKit can get a dead/silent audio track.
       try {
-        const permStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        permStream.getTracks().forEach((t) => t.stop());
-        console.log("[GAME] Mic permission granted (stream released for SDK)");
-      } catch (err) {
-        console.error("[GAME] Microphone permission denied:", err);
-        dispatch({ type: "SET_STATUS", status: "error" });
-        return;
+        const permResult = await navigator.permissions.query({ name: "microphone" as PermissionName });
+        if (permResult.state === "denied") {
+          console.error("[GAME] Microphone permission denied (checked via Permissions API)");
+          dispatch({ type: "SET_STATUS", status: "error" });
+          return;
+        }
+        console.log(`[GAME] Mic permission state: ${permResult.state} — LiveKit will prompt if needed`);
+      } catch {
+        // permissions.query may not be supported — proceed anyway, LiveKit will prompt
+        console.warn("[GAME] Could not query mic permission state, proceeding");
       }
 
       // Overrides enabled on dashboard Security tab.
@@ -308,7 +333,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // story_id passed via elevenlabs_extra_body so the webhook knows which story config to load.
       console.log(`[GAME] firstMessage: "${resolvedFirstMessage.slice(0, 60)}…"`);
 
-      const cid = await conversation.startSession({
+      const cid = await conversationRef.current!.startSession({
         agentId,
         connectionType: "webrtc",
         overrides: {
@@ -335,17 +360,18 @@ export function GameProvider({ children }: { children: ReactNode }) {
       console.error("[GAME] Failed to start session:", err);
       dispatch({ type: "SET_STATUS", status: "error" });
     }
-  }, [conversation]);
+  }, []);
 
   // ── End session ───────────────────────────────────────────────
   const endSession = useCallback(async () => {
     console.log("[GAME] Ending session");
-    stopPolling();
-    await conversation.endSession();
+    stopPollingRef.current();
+    clearSilenceTimerRef.current();
+    await conversationRef.current?.endSession();
     conversationIdRef.current = null;
     dispatch({ type: "SET_CONVERSATION_ID", id: null });
     dispatch({ type: "SET_STATUS", status: "idle" });
-  }, [conversation, stopPolling]);
+  }, []);
 
   // ── Select narrative choice ───────────────────────────────────
   const selectChoice = useCallback(
@@ -373,15 +399,15 @@ export function GameProvider({ children }: { children: ReactNode }) {
 
   // ── Toggle pause ────────────────────────────────────────────
   const togglePause = useCallback(() => {
-    const willPause = !state.isPaused;
     dispatch({ type: "TOGGLE_PAUSE" });
-    // Mute/unmute ElevenLabs TTS output
-    if (willPause) {
-      conversation.setVolume({ volume: 0 });
-    } else {
-      conversation.setVolume({ volume: 1 });
-    }
-  }, [state.isPaused, conversation]);
+    // Mute/unmute ElevenLabs TTS output — read current state from reducer
+    // (state.isPaused before dispatch is the "old" value, so !old = new)
+  }, []);
+
+  // Apply pause volume via effect so it reads the latest state
+  useEffect(() => {
+    conversationRef.current?.setVolume({ volume: state.isPaused ? 0 : 1 });
+  }, [state.isPaused]);
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
