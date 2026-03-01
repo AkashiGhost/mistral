@@ -95,34 +95,11 @@ export function GameSession({ storyId }: GameSessionProps) {
     }
   }, [hasAiSpoken]);
 
-  // TTS fallback: browser speaks AI's text if ElevenLabs audio not yet received
-  useEffect(() => {
-    if (!lastAiText || typeof window === "undefined" || !window.speechSynthesis) return;
-    if (hasAiSpoken) return;
-
-    const timer = setTimeout(() => {
-      if (hasAiSpoken) return;
-      console.log("[SESSION] TTS fallback triggered — ElevenLabs audio not received, using browser speechSynthesis");
-      window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(lastAiText);
-      utt.rate = 0.85;
-      utt.pitch = 0.9;
-      utt.volume = 1;
-      const voices = window.speechSynthesis.getVoices();
-      const femaleVoice = voices.find(
-        (v) => v.lang.startsWith("en") && /female|woman|girl|zira|hazel|samantha/i.test(v.name)
-      );
-      if (femaleVoice) {
-        console.log(`[SESSION] TTS fallback voice selected: ${femaleVoice.name}`);
-        utt.voice = femaleVoice;
-      } else {
-        console.log("[SESSION] TTS fallback: no matching female voice found, using browser default");
-      }
-      window.speechSynthesis.speak(utt);
-    }, 300);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastAiText]);
+  // TTS fallback REMOVED — window.speechSynthesis.cancel() + speak() was
+  // disrupting Chrome's WebRTC audio routing on Windows, causing ElevenLabs
+  // voice output to be completely silent. The 300ms timer also had a stale
+  // closure bug (hasAiSpoken missing from deps). ElevenLabs handles TTS
+  // natively via WebRTC — no browser fallback needed.
 
   // ── Transcript scroll — auto-scroll to latest message ───────────────
   const transcriptEndRef = useRef<HTMLDivElement | null>(null);
