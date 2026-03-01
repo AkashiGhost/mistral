@@ -9,6 +9,7 @@
 // ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { getGameConfig, DEFAULT_STORY_ID, type StoryId } from "@/lib/config-loader";
 import {
   getSession,
@@ -33,46 +34,69 @@ function getConfig(storyId?: StoryId): GameConfig {
 
 const intentParser = new MistralIntentParser(process.env.MISTRAL_API_KEY!);
 
-interface LLMWebhookMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
+const WebhookMessageSchema = z.object({
+  role: z.enum(["system", "user", "assistant"]),
+  content: z.string(),
+});
 
-interface LLMWebhookRequest {
-  messages: LLMWebhookMessage[];
-  model?: string;
-  temperature?: number;
-  max_tokens?: number;
-  stream?: boolean;
-  conversation_id?: string;
-  custom_llm_extra_body?: Record<string, unknown>;
-}
+const WebhookRequestSchema = z.object({
+  messages: z.array(WebhookMessageSchema).min(1, "At least one message required"),
+  model: z.string().optional(),
+  temperature: z.number().optional(),
+  max_tokens: z.number().optional(),
+  stream: z.boolean().optional(),
+  conversation_id: z.string().optional(),
+  custom_llm_extra_body: z.record(z.string(), z.unknown()).optional(),
+});
+
+// Derive types from schemas
+type LLMWebhookMessage = z.infer<typeof WebhookMessageSchema>;
+type LLMWebhookRequest = z.infer<typeof WebhookRequestSchema>;
 
 export async function POST(req: NextRequest) {
   const requestStart = Date.now();
   console.log(`[WEBHOOK] === NEW REQUEST === timestamp=${new Date(requestStart).toISOString()}`);
 
   try {
-    const body = (await req.json()) as LLMWebhookRequest;
+    // ── Parse & validate incoming payload ──────────────────────
+    let rawBody: unknown;
+    try {
+      rawBody = await req.json();
+    } catch (parseErr) {
+      const parseError = parseErr as Error;
+      console.error(`[WEBHOOK] JSON parse failed: ${parseError.message}`);
+      return NextResponse.json(
+        { error: "Invalid JSON", detail: parseError.message },
+        { status: 400 },
+      );
+    }
+
+    const parseResult = WebhookRequestSchema.safeParse(rawBody);
+    if (!parseResult.success) {
+      console.error(`[WEBHOOK] Payload validation failed:`, {
+        errors: parseResult.error.issues,
+        rawKeys: typeof rawBody === "object" && rawBody !== null ? Object.keys(rawBody) : "not-object",
+      });
+      return NextResponse.json(
+        { error: "Invalid payload", issues: parseResult.error.issues.map(i => `${i.path.join(".")}: ${i.message}`) },
+        { status: 400 },
+      );
+    }
+    const body = parseResult.data;
 
     // ── Log full request shape ───────────────────────────────────
-    const messageSummary = (body.messages ?? []).map((m) => ({
+    const messageSummary = body.messages.map((m) => ({
       role: m.role,
-      contentLength: m.content?.length ?? 0,
+      contentLength: m.content.length,
     }));
-    const elevenLabsSystemPrompt = body.messages?.find((m) => m.role === "system")?.content ?? "";
-    console.log(`[WEBHOOK] Body parsed: messageCount=${body.messages?.length ?? 0}, stream=${body.stream ?? false}`);
+    const elevenLabsSystemPrompt = body.messages.find((m) => m.role === "system")?.content ?? "";
+    console.log(`[WEBHOOK] Body parsed: messageCount=${body.messages.length}, stream=${body.stream ?? false}`);
     console.log(`[WEBHOOK] Messages breakdown:`, JSON.stringify(messageSummary));
     console.log(`[WEBHOOK] ElevenLabs system prompt preview (first 200): "${elevenLabsSystemPrompt.slice(0, 200)}"`);
     console.log(`[WEBHOOK] conversation_id from body: ${body.conversation_id ?? "(none)"}`);
     console.log(`[WEBHOOK] custom_llm_extra_body present: ${!!body.custom_llm_extra_body}`);
 
     const { messages } = body;
-
-    if (!Array.isArray(messages)) {
-      console.error("[WEBHOOK] ERROR: messages field is not an array");
-      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-    }
 
     // Extract conversation_id from available sources (priority order)
     let conversation_id = body.conversation_id
@@ -233,10 +257,10 @@ export async function POST(req: NextRequest) {
 
     const sseStream = new ReadableStream({
       async start(controller) {
+        let chunkCount = 0;
         try {
           let first = true;
           let firstChunkTime: number | null = null;
-          let chunkCount = 0;
 
           // Regex to strip [SOUND:x] markers before sending to ElevenLabs TTS.
           // Markers are collected from fullText post-stream for game state updates.
@@ -304,8 +328,13 @@ export async function POST(req: NextRequest) {
           );
         } catch (err) {
           const error = err as Error;
-          console.error(`[WEBHOOK] ERROR inside SSE stream: ${error.message}`);
-          console.error(error.stack);
+          console.error(`[WEBHOOK] ERROR inside SSE stream:`, {
+            errorMessage: error.message,
+            errorName: error.name,
+            stack: error.stack,
+            fullTextSoFar: fullText.slice(0, 200),
+            chunksEmitted: chunkCount,
+          });
           // Send a graceful fallback instead of controller.error() which kills
           // the ElevenLabs connection with no explanation.
           try {
@@ -339,9 +368,14 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     const error = err as Error;
-    console.error(`[WEBHOOK] ERROR: ${error.message}`);
-    console.error(error.stack);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    console.error(`[WEBHOOK] UNHANDLED ERROR:`, {
+      errorMessage: error.message,
+      errorName: error.name,
+      stack: error.stack,
+      elapsed: `${Date.now() - requestStart}ms`,
+    });
+    // Return an in-character SSE fallback so ElevenLabs doesn't use its dashboard prompt
+    return openAiSSEResponse("... Give me a moment. Something feels off.");
   }
 }
 
@@ -453,8 +487,16 @@ async function performPostStreamUpdates(
     console.log(`[WEBHOOK] performPostStreamUpdates complete for conversationId=${conversationId}`);
   } catch (err) {
     const error = err as Error;
-    console.error(`[WEBHOOK] ERROR in performPostStreamUpdates: ${error.message}`);
-    console.error(error.stack);
+    console.error(`[WEBHOOK] ERROR in performPostStreamUpdates:`, {
+      errorMessage: error.message,
+      errorName: error.name,
+      stack: error.stack,
+      conversationId,
+      playerText: playerText.slice(0, 100),
+      responseLength: rawResponse.length,
+      currentPhase: state.currentPhaseIndex,
+      currentBeat: state.currentBeatIndex,
+    });
   }
 }
 
