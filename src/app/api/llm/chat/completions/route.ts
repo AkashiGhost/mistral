@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       session = createSession(conversation_id, initialState, storyId);
     }
     console.log(
-      `[WEBHOOK] Session: ${sessionWasNew ? "created" : "found"}, conversationId=${conversation_id}, gameOver=${session.gameOver}, phase=${session.state.currentPhaseIndex}, beat=${session.state.currentBeatIndex}`,
+      `[WEBHOOK] [T+${Date.now() - requestStart}ms] Session: ${sessionWasNew ? "created" : "found"}, conversationId=${conversation_id}, gameOver=${session.gameOver}, phase=${session.state.currentPhaseIndex}, beat=${session.state.currentBeatIndex}`,
     );
 
     if (session.gameOver) {
@@ -260,18 +260,41 @@ export async function POST(req: NextRequest) {
       ].join("\n");
     }
 
-    console.log(`[WEBHOOK] System prompt length: ${systemPrompt.length} chars, preview: "${systemPrompt.slice(0, 200)}"`);
+    console.log(`[WEBHOOK] [T+${Date.now() - requestStart}ms] System prompt length: ${systemPrompt.length} chars, preview: "${systemPrompt.slice(0, 200)}"`);
 
     // ── Assemble messages for Mistral ─────────────────────────────
-    // Replace ElevenLabs system message with ours; pass conversation history as-is
+    // Replace ElevenLabs system message with ours; truncate history to prevent
+    // Vercel Hobby 10s timeout. As the conversation grows, Mistral's response
+    // time increases linearly. Keeping only the most recent turns + first
+    // exchange ensures the function stays well within the timeout.
+    const nonSystemMsgs = messages
+      .filter((m) => m.role !== "system")
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    const MAX_HISTORY_MESSAGES = 8; // 4 turn pairs — enough for context
+    let truncatedMsgs = nonSystemMsgs;
+    if (nonSystemMsgs.length > MAX_HISTORY_MESSAGES) {
+      // Keep first exchange (narrative continuity) + most recent turns
+      const firstPair = nonSystemMsgs.slice(0, 2);
+      const recentPairs = nonSystemMsgs.slice(-(MAX_HISTORY_MESSAGES - 2));
+      truncatedMsgs = [...firstPair, ...recentPairs];
+      console.log(
+        `[WEBHOOK] History truncated: ${nonSystemMsgs.length} → ${truncatedMsgs.length} messages ` +
+        `(kept first 2 + last ${MAX_HISTORY_MESSAGES - 2})`,
+      );
+    }
+
     const mistralMessages: Array<{ role: "system" | "user" | "assistant"; content: string }> = [
       { role: "system", content: systemPrompt },
-      ...messages
-        .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role, content: m.content })),
+      ...truncatedMsgs,
     ];
 
-    console.log(`[WEBHOOK] Starting Mistral stream with ${mistralMessages.length} messages`);
+    const elapsed = Date.now() - requestStart;
+    console.log(
+      `[WEBHOOK] [T+${elapsed}ms] Starting Mistral stream with ${mistralMessages.length} messages ` +
+      `(${nonSystemMsgs.length} non-system, ${truncatedMsgs.length} after truncation), ` +
+      `system prompt: ${systemPrompt.length} chars`,
+    );
 
     // ── Stream Mistral Large → SSE in real-time ─────────────────
     // Chunks are forwarded to ElevenLabs as they arrive from Mistral,
@@ -290,6 +313,11 @@ export async function POST(req: NextRequest) {
     const capturedConfig = config;
     const capturedPlayerText = playerText;
 
+    // ── Vercel Hobby safety: abort Mistral stream if function time budget exceeded ──
+    // Vercel Hobby kills functions at 10s. We need ~500ms for post-stream work,
+    // so abort the stream at 8.5s and return whatever we have + a graceful fallback.
+    const FUNCTION_TIME_BUDGET_MS = 8500;
+
     const sseStream = new ReadableStream({
       async start(controller) {
         let chunkCount = 0;
@@ -305,6 +333,15 @@ export async function POST(req: NextRequest) {
             process.env.MISTRAL_API_KEY!,
             mistralMessages,
           )) {
+            // ── Time budget check — abort gracefully before Vercel kills us ──
+            const elapsed = Date.now() - requestStart;
+            if (elapsed > FUNCTION_TIME_BUDGET_MS) {
+              console.warn(
+                `[WEBHOOK] [T+${elapsed}ms] ⚠ TIME BUDGET EXCEEDED — aborting stream after ${chunkCount} chunks. ` +
+                `Sending what we have (${fullText.length} chars) to prevent Vercel timeout`,
+              );
+              break;
+            }
             if (first) {
               firstChunkTime = Date.now();
               console.log(`[WEBHOOK] First chunk received after ${firstChunkTime - requestStart}ms`);
@@ -336,7 +373,23 @@ export async function POST(req: NextRequest) {
             first = false;
           }
 
-          console.log(`[WEBHOOK] Stream complete, total chunks=${chunkCount}, total response: ${fullText.length} chars, preview: "${fullText.slice(0, 200)}"`);
+          console.log(`[WEBHOOK] [T+${Date.now() - requestStart}ms] Stream complete, total chunks=${chunkCount}, total response: ${fullText.length} chars, preview: "${fullText.slice(0, 200)}"`);
+
+          // If we got zero content (Mistral was too slow to produce anything),
+          // inject a graceful fallback so ElevenLabs has something to speak.
+          if (fullText.length === 0) {
+            console.warn(`[WEBHOOK] [T+${Date.now() - requestStart}ms] ⚠ Zero content from Mistral — injecting fallback`);
+            const fallbackContent = "... Give me a moment. Let me gather my thoughts.";
+            fullText = fallbackContent;
+            const fallbackChunk = {
+              id: sseId,
+              object: "chat.completion.chunk",
+              created,
+              model: "mistral-large-latest",
+              choices: [{ index: 0, delta: { role: "assistant" as const, content: fallbackContent }, finish_reason: null }],
+            };
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify(fallbackChunk)}\n\n`));
+          }
 
           // Finish chunk
           const finish = {
