@@ -11,7 +11,6 @@ interface FullScreenMenuProps {
 
 const MENU_ITEMS = [
   { label: "STORIES", href: "/#stories", accent: false },
-  { label: "ABOUT", href: "/about", accent: false },
   { label: "BEGIN", href: "/#stories", accent: true },
 ];
 

@@ -2,111 +2,102 @@
 
 **Voice-based immersive horror game powered by Mistral AI + ElevenLabs Conversational AI**
 
-The player speaks into their microphone. ElevenLabs handles real-time STT and TTS via WebRTC. Our webhook injects the story engine (state machine, rules, context builder) and streams Mistral Large responses back as SSE. The client polls for game state updates (choices, sound cues, phase transitions) on a separate channel.
+The player speaks into their microphone. ElevenLabs handles real-time STT and TTS via WebRTC, calling Mistral Large directly with a system prompt injected by the client at session start. There is no custom webhook in the voice path. All game state lives in the browser. Sound is driven by a client-side timeline and keyword detection on AI narration text.
 
 ---
 
-## System Architecture
+## Diagram 1: System Architecture (High-Level)
 
 ```mermaid
 flowchart TB
     subgraph Browser["Browser (Next.js React App)"]
-        UI["Game UI<br/><small>GameContext + useReducer</small>"]
-        SA["Sound Engine<br/><small>Web Audio API</small>"]
+        UI["Game UI<br/><small>GameSession + OnboardingFlow</small>"]
+        GC["Game State<br/><small>GameContext + useReducer</small>"]
+        SE["Sound Engine<br/><small>Web Audio API</small>"]
         EL_SDK["ElevenLabs React SDK<br/><small>useConversation hook</small>"]
+        SCP["Sound Cue Parser<br/><small>Keyword regex → one-shot cues</small>"]
+        TL["Timeline Executor<br/><small>Time-triggered ambient events</small>"]
     end
 
     subgraph ElevenLabs["ElevenLabs ConvAI Platform"]
-        STT["Speech-to-Text"]
-        TTS["Text-to-Speech<br/><small>Elara's voice</small>"]
-        AGENT["Conversational Agent<br/><small>WebRTC session manager</small>"]
-    end
-
-    subgraph Vercel["Vercel (Next.js API Routes)"]
-        WEBHOOK["/api/llm/chat/completions<br/><small>Custom LLM Webhook</small>"]
-        GSAPI["/api/game-state<br/><small>State Polling Endpoint</small>"]
-        SESS["Session Store<br/><small>In-memory Map</small>"]
-
-        subgraph Engine["Story Engine"]
-            CB["Context Builder<br/><small>5-layer prompt assembly</small>"]
-            SM["State Machine<br/><small>Pure functions, dot-path mutations</small>"]
-            RE["Rules Engine<br/><small>Intent validation, constraint redirects</small>"]
-            SCP["Sound Cue Parser<br/><small>[SOUND:x] extraction</small>"]
-            ST["Style Tracker<br/><small>Player therapy style scoring</small>"]
-        end
+        WS["WebRTC Session Manager"]
+        STT["STT<br/><small>Speech-to-Text</small>"]
+        TTS["TTS<br/><small>Elara's voice</small>"]
     end
 
     subgraph Mistral["Mistral AI"]
         ML["Mistral Large<br/><small>Story narration, streaming</small>"]
-        MS["Mistral Small<br/><small>Intent classification</small>"]
     end
 
-    subgraph Content["Story Content"]
-        YAML["YAML Story Files<br/><small>arc, world, characters,<br/>prompts, sounds, endings</small>"]
-        SCHEMA["JSON Schemas<br/><small>Per-file validation</small>"]
+    subgraph Vercel["Vercel (Next.js)"]
+        SU["/api/signed-url<br/><small>Agent auth — server-side API key</small>"]
+        STATIC["Static Assets<br/><small>Next.js pages, images</small>"]
     end
+
+    subgraph Content["Story Content (TypeScript)"]
+        SP["System Prompts<br/><small>story-prompts.ts — per-story</small>"]
+        TIMELINES["Sound Timelines<br/><small>useSoundEngine.ts</small>"]
+        SYNTH["Synth Sounds<br/><small>synth-sounds.ts — OfflineAudioContext</small>"]
+        OB["Onboarding Scenes<br/><small>OnboardingFlow.tsx</small>"]
+    end
+
+    %% Session startup
+    Browser -- "1. GET /api/signed-url" --> SU
+    SU -- "2. signedUrl (temp token)" --> Browser
 
     %% Voice flow
-    UI -- "Microphone audio" --> EL_SDK
-    EL_SDK -- "WebRTC" --> AGENT
-    AGENT --> STT
-    STT -- "Transcribed text +<br/>conversation history" --> WEBHOOK
-
-    %% Webhook to Mistral
-    WEBHOOK --> CB
-    CB --> ML
-    ML -- "SSE stream<br/>(text chunks)" --> WEBHOOK
-    WEBHOOK -- "SSE response<br/>([SOUND:x] stripped)" --> AGENT
-    AGENT --> TTS
+    UI -- "Mic audio" --> EL_SDK
+    EL_SDK -- "3. startSession(signedUrl,<br/>overrides.agent.prompt)" --> WS
+    WS --> STT
+    STT -- "Transcribed text +<br/>conversation history" --> ML
+    ML -- "Streaming response" --> TTS
     TTS -- "WebRTC audio" --> EL_SDK
     EL_SDK -- "Speaker output" --> UI
 
-    %% Post-stream processing
-    WEBHOOK --> SCP
-    WEBHOOK --> SM
-    WEBHOOK --> ST
-    ST --> MS
-    WEBHOOK --> SESS
+    %% Client-side sound
+    EL_SDK -- "onMessage(aiText)" --> GC
+    GC -- "lastAiText" --> SCP
+    SCP -- "matched cues" --> SE
+    TL -- "time-triggered events" --> SE
 
-    %% State polling
-    UI -- "GET /api/game-state<br/>every 3s" --> GSAPI
-    GSAPI --> SESS
-    GSAPI -- "phase, beat, choices,<br/>sound cues, gameOver" --> UI
-    UI --> SA
+    %% Content wiring
+    SP -- "prompt override at session start" --> EL_SDK
+    TIMELINES -- "timeline events" --> TL
+    SYNTH -- "AudioBuffers" --> SE
 
-    %% Content loading
-    YAML --> CB
-    SCHEMA --> YAML
+    %% TTS ducking
+    EL_SDK -- "isSpeaking flag" --> SE
 
     %% Styling
     style Browser fill:#1a1a2e,stroke:#e94560,color:#eee
     style ElevenLabs fill:#0f3460,stroke:#533483,color:#eee
-    style Vercel fill:#16213e,stroke:#e94560,color:#eee
     style Mistral fill:#2b1055,stroke:#d63384,color:#eee
+    style Vercel fill:#16213e,stroke:#e94560,color:#eee
     style Content fill:#1a1a2e,stroke:#533483,color:#eee
-    style Engine fill:#0d1b2a,stroke:#e94560,color:#eee
 ```
 
 ### Component Summary
 
 | Component | Technology | Role |
 |-----------|-----------|------|
-| **Game UI** | Next.js 16 + React + useReducer | Manages client state, renders choices, controls sound |
-| **ElevenLabs ConvAI** | WebRTC, STT, TTS | Voice I/O -- transcribes speech, synthesizes Elara's voice |
-| **Custom LLM Webhook** | Next.js API Route (Node.js runtime) | Receives conversation history, injects story context, streams Mistral response |
-| **Context Builder** | TypeScript, 5-layer prompt | Assembles world rules + character card + phase override + history + state snapshot |
-| **State Machine** | Pure functions, immutable state | Tracks phase/beat progression, choice resolution, ending evaluation |
-| **Rules Engine** | Constraint matching | Validates player intents against world physics rules |
-| **Sound Cue Parser** | Regex extraction | Extracts `[SOUND:x]` markers from LLM output, strips before TTS |
-| **Style Tracker** | Scoring system | Tracks player therapy style (empathetic/analytical/nurturing/confrontational) |
-| **Session Store** | In-memory Map | Per-conversation state, 30-min TTL, keyed by ElevenLabs conversation_id |
-| **Mistral Large** | `mistral-large-latest` | Story narration -- streaming responses with sound cue markers |
-| **Mistral Small** | `mistral-small-latest` | Intent classification -- fast, cheap, runs post-stream |
-| **Story YAML** | 8+ YAML files per story | Pre-authored narrative structure: phases, beats, choices, endings, character arcs |
+| **Game UI** | Next.js 16, React, GameSession, OnboardingFlow | Renders transcript overlay, breathing indicator, pause/end controls, onboarding scenes |
+| **Game State** | React useReducer (GameContext) | Tracks status, elapsed seconds, isSpeaking, transcript, conversationId — entirely client-side, no server sync |
+| **ElevenLabs React SDK** | `@elevenlabs/react` useConversation | Owns WebRTC session: mic capture, STT, TTS playback, onMessage/onModeChange callbacks |
+| **ElevenLabs ConvAI** | WebRTC, STT, TTS | Real-time voice I/O — transcribes player speech, calls Mistral directly, synthesizes Elara's voice |
+| **Mistral Large** | `mistral-large-latest` via ElevenLabs agent config | Story narration — receives conversation history + system prompt, streams response back to TTS |
+| **/api/signed-url** | Next.js API Route (Node.js runtime) | Only server-side API route in the voice path — exchanges `ELEVENLABS_API_KEY` for a short-lived signed URL |
+| **System Prompts** | `src/lib/story-prompts.ts` | Per-story TypeScript strings — injected at session start via `overrides.agent.prompt.prompt` |
+| **Sound Engine** | `src/lib/sound-engine.ts`, Web Audio API | Manages ambient loops, crossfades, TTS ducking, spatial panning, hard stops |
+| **Sound Cue Parser** | `src/lib/sound-cue-parser.ts`, regex | Matches AI narration text against per-story keyword rules → triggers one-shot sound cues |
+| **Timeline Executor** | `src/hooks/useSoundEngine.ts` | Fires pre-authored time-based sound events (fade in, fade out, volume adjust, mute all) |
+| **Synth Sounds** | `src/lib/synth-sounds.ts`, OfflineAudioContext | Generates all ambient audio programmatically in-browser (no audio files to serve) |
+| **Onboarding Flow** | `src/components/game/OnboardingFlow.tsx` | Scene images → headphones prompt → countdown → (the-call: phone ring) → session start |
 
 ---
 
-## Request Pipeline (Single Turn)
+## Diagram 2: Voice Pipeline (Sequence Diagram)
+
+One complete conversation turn from player speech to Elara's voice, with parallel client-side processing.
 
 ```mermaid
 sequenceDiagram
@@ -114,101 +105,163 @@ sequenceDiagram
     participant P as Player
     participant B as Browser<br/>(GameContext)
     participant EL as ElevenLabs<br/>(ConvAI)
-    participant WH as Webhook<br/>(/api/llm/chat/completions)
-    participant CB as Context<br/>Builder
-    participant ML as Mistral<br/>Large
-    participant MS as Mistral<br/>Small
-    participant SS as Session<br/>Store
-    participant GS as /api/game-state
+    participant ML as Mistral Large
+    participant SE as Sound Engine<br/>(Web Audio API)
 
-    Note over P,GS: Player speaks into microphone
+    Note over P,SE: Player speaks — ElevenLabs listens via WebRTC
 
     P->>B: Voice input (microphone)
-    B->>EL: WebRTC audio stream
-    EL->>EL: STT transcription
+    B->>EL: WebRTC audio stream (continuous)
+    EL->>EL: STT transcription (~300ms)
+    Note over EL: onMessage(source:"user") → GameContext logs transcript
 
-    Note over EL,WH: ElevenLabs calls webhook with full conversation history
+    Note over EL,ML: ElevenLabs forwards to Mistral with system prompt + history
 
-    EL->>WH: POST /api/llm/chat/completions<br/>{messages: [...], stream: true}
+    EL->>ML: Conversation history + system prompt<br/>(injected at session start from story-prompts.ts)
+    ML->>ML: Generate response (~500-800ms to first token)
 
-    WH->>SS: getSession(conversation_id)
-    SS-->>WH: Session state (or create new)
-
-    Note over WH: Check pending choices
-
-    alt Pending voice choice exists
-        WH->>WH: Match player response to choice options<br/>(keyword matching on labels)
-        WH->>SS: resolveChoice() + clear pendingChoice
-    end
-
-    Note over WH,CB: Build 5-layer system prompt
-
-    WH->>CB: buildContext(config, state, phase, beat)
-    CB-->>WH: Layer 1: World rules + character card<br/>Layer 2: Phase override + beat purpose<br/>Layer 3: Recent exchanges (last 6 turns)<br/>Layer 4: Compressed history<br/>Layer 5: State snapshot (JSON)
-
-    Note over WH,ML: Stream narration from Mistral Large
-
-    WH->>ML: chat.stream({model: "mistral-large-latest",<br/>messages, temperature: 0.85, maxTokens: 300})
-
-    loop SSE chunks (real-time)
-        ML-->>WH: Text chunk (delta)
-        WH->>WH: Strip [SOUND:x] markers from chunk
-        WH-->>EL: SSE: data: {delta: {content: "clean text"}}
-        EL->>EL: TTS synthesis (progressive)
+    loop Streaming response tokens
+        ML-->>EL: Text chunk (streaming)
+        EL->>EL: TTS synthesis (progressive, ~200ms)
         EL-->>B: WebRTC audio chunk
-        B-->>P: Speaker output (Elara's voice)
+        B-->>P: Speaker output — Elara's voice
     end
 
-    ML-->>WH: Stream complete (finish_reason: "stop")
-    WH-->>EL: SSE: data: [DONE]
+    Note over EL,B: Stream complete — onMessage(source:"ai") fires with full text
 
-    Note over WH,SS: Post-stream updates (fire-and-forget)
+    EL->>B: onMessage(aiText) — full narration text
+    B->>B: Dispatch AI_TEXT + ADD_TRANSCRIPT to reducer
 
-    par Async state updates
-        WH->>WH: parseSoundCues(fullText)<br/>Extract [SOUND:x] markers
-        WH->>WH: advanceBeat() + check phase transition
-        WH->>WH: evaluateEndingCondition()<br/>(only in final phase)
-        WH->>WH: Detect choice beats for next turn
-        WH->>MS: Intent classification<br/>(playerText -> emotional register)
-        MS-->>WH: {intent, emotionalRegister, challengeLevel}
-        WH->>WH: applyIntentScore() — style tracking
-        WH->>SS: updateSession(state, pendingChoice,<br/>pendingSoundCues, gameOver)
+    par Client-side parallel processing
+        B->>SE: parseSoundCues(aiText, storyId)<br/>Regex keyword match → one-shot cue IDs
+        SE->>SE: triggerCue(soundId, volume)<br/>30s cooldown per sound ID
+
+    and TTS ducking lifecycle
+        EL->>B: onModeChange("speaking") → isSpeaking = true
+        B->>SE: startDucking() — ambient volumes -6dB (300ms fade)
+        EL->>B: onModeChange("listening") → isSpeaking = false
+        B->>SE: stopDucking() — restore base volumes (600ms fade)
+
+    and Elapsed time tracking
+        B->>B: setInterval TICK every 1s<br/>elapsedSeconds drives phase display
     end
 
-    Note over B,GS: Client polls for UI updates (every 3 seconds)
+    Note over B,SE: Timeline events fire independently based on elapsed time
 
-    B->>GS: GET /api/game-state?cid=xxx
-    GS->>SS: getSession(cid)
-    SS-->>GS: Session data
-    GS-->>B: {phase, beatIndex, trustLevel,<br/>activeChoice, soundCues, gameOver}
-    B->>B: Dispatch STATE_POLL to reducer<br/>Play sound cues via Web Audio API
+    SE->>SE: Timeline executor polls every 100ms<br/>Fires pre-authored events at specific timestamps<br/>(fade_in, fade_out, hard_stop, mute_all, volume_adjust)
 ```
 
-### Pipeline Timing
+### Voice-to-Voice Timing
 
 | Step | Latency | Notes |
 |------|---------|-------|
-| STT (ElevenLabs) | ~300ms | Real-time transcription via WebRTC |
-| Webhook processing | ~5-15ms | Session lookup, choice matching, context building |
-| Mistral Large first chunk | ~500-800ms | Time to first SSE chunk (streaming) |
-| TTS (ElevenLabs) | ~200ms | Progressive synthesis starts on first sentence |
-| Intent classification | ~200-400ms | Mistral Small, runs async post-stream |
-| State poll | 3s interval | Non-blocking, UI update channel |
+| STT (ElevenLabs) | ~300ms | Real-time transcription via WebRTC VAD |
+| Mistral Large first token | ~500-800ms | Streaming — TTS starts on first sentence |
+| TTS progressive synthesis | ~200ms | ElevenLabs synthesizes as tokens arrive |
+| **Total voice-to-voice** | **~1-1.5s** | Player speaks → Elara responds |
+| Sound cue parsing | <5ms | Client-side regex, runs after full text received |
+| TTS duck fade-in | 300ms | Ambient -6dB when Elara starts speaking |
+| TTS duck restore | 600ms | Ambient returns to base when Elara stops |
 
-**Total voice-to-voice latency: ~1-1.5 seconds** (STT + webhook + Mistral first chunk + TTS)
+---
+
+## Diagram 3: Sound Design Pipeline
+
+How all audio layers are generated, initialized, and driven during a game session.
+
+```mermaid
+flowchart TB
+    subgraph Onboarding["Onboarding Phase (before session)"]
+        RING["Phone Ring<br/><small>the-call only<br/>Web Audio oscillator<br/>440Hz + 480Hz, 2s on / 4s off</small>"]
+    end
+
+    subgraph Startup["Session Start (t=0)"]
+        EL_WS["ElevenLabs WebRTC<br/>Audio Establishes"]
+        DELAY["3s Delay<br/><small>Lets WebRTC audio<br/>stabilize first</small>"]
+    end
+
+    subgraph Init["Sound Engine Init (t+3s)"]
+        OAC["OfflineAudioContext<br/>Renders 6-13 synthetic sounds<br/>in parallel (Promise.all)"]
+        AC["AudioContext Created<br/>+ MasterGain node"]
+        REG["Buffers Registered<br/>per story sound palette"]
+        START_TL["Timeline Started<br/>setInterval 100ms poll"]
+    end
+
+    subgraph Gameplay["During Gameplay"]
+        direction TB
+
+        subgraph Timeline["Timeline Events (time-based)"]
+            T0["t=0s: start_ambient<br/><small>Loops begin (rain, hvac, clock)</small>"]
+            T1["t=210s: fade_out<br/><small>HVAC fades over 4s</small>"]
+            T2["t=360s: fade_in<br/><small>Cello drone + sub bass emerge</small>"]
+            T3["t=420s: hard_stop<br/><small>Clock stops instantly</small>"]
+            T4["t=480s: mute_all<br/><small>0.5s fade — revelation moment</small>"]
+            T5["t=482s: fade_in<br/><small>Low tone for revelation</small>"]
+            T0 --> T1 --> T2 --> T3 --> T4 --> T5
+        end
+
+        subgraph Keyword["Keyword Detection (AI text)"]
+            KW1["onMessage(aiText)"]
+            KW2["parseSoundCues(text, storyId)<br/><small>Regex rules per story</small>"]
+            KW3["cooldown check<br/><small>30s per sound ID</small>"]
+            KW4["triggerCue(soundId)<br/><small>One-shot playback</small>"]
+            KW1 --> KW2 --> KW3 --> KW4
+        end
+
+        subgraph Ducking["TTS Ducking"]
+            D1["isSpeaking = true<br/>(Elara speaking)"]
+            D2["startDucking()<br/><small>All ambient -6dB<br/>300ms fade</small>"]
+            D3["isSpeaking = false<br/>(Elara stops)"]
+            D4["stopDucking()<br/><small>Restore base volumes<br/>600ms fade</small>"]
+            D1 --> D2 --> D3 --> D4 --> D1
+        end
+
+        subgraph Spatial["Spatial Audio"]
+            PAN["StereoPannerNode<br/>per channel<br/><small>rain: -0.3L, clock: 0.2R,<br/>hvac: center, etc.</small>"]
+        end
+    end
+
+    subgraph End["Game End"]
+        FADE["fade_all_to_nothing()<br/><small>15-30s graceful fade</small>"]
+        DESTROY["engine.destroy()<br/><small>AudioContext.close()<br/>All sources stopped<br/>Buffers cleared</small>"]
+        FADE --> DESTROY
+    end
+
+    Onboarding --> Startup
+    EL_WS --> DELAY
+    DELAY --> Init
+    OAC --> REG
+    AC --> REG
+    REG --> START_TL
+    Init --> Gameplay
+    Gameplay --> End
+```
+
+### Sound Palette by Story
+
+| Story | Ambient Loops | One-Shot Cues | Key Timeline Moments |
+|-------|--------------|---------------|---------------------|
+| **The Last Session** | rain, hvac, clock, cello_drone, sub_bass, low_tone | rain, clock, cello_drone, low_tone | HVAC fades at 3:30, clock hard-stops at 7:00, mute_all at 8:00 for revelation |
+| **The Lighthouse** | ocean, wind, creak, foghorn_drone, sub_bass | ocean, wind, creak, foghorn_drone | Wind intensifies at 4:00, creak fades at 6:00, fade_all_to_nothing at 9:00 |
+| **Room 4B** | fluorescent_hum, machinery, metal_echo, heartbeat_drone, sub_bass, low_tone | fluorescent_hum, machinery, metal_echo, heartbeat_drone | Machinery hard-stops at 6:00, fluorescent dies at 7:30 |
+| **The Call** | phone_static, electrical_hum, sub_bass | footsteps, water_drip, door_creak, keypad_beep, metal_scrape, pipe_clank, heavy_breathing, disconnect_tone | Phone ring plays during onboarding; pickup_click fires on AI first speech |
 
 ---
 
 ## Key Design Decisions
 
-1. **ElevenLabs as voice backbone** -- WebRTC handles STT/TTS, custom LLM webhook lets us inject our game engine between transcription and speech synthesis.
+1. **ElevenLabs calls Mistral directly** — No custom webhook in the voice path. The system prompt is sent from the client at session start via `overrides.agent.prompt.prompt`. ElevenLabs manages the LLM call, conversation history, and TTS internally. This eliminates latency from a server hop and removes all server-side session state.
 
-2. **Streaming SSE** -- Mistral chunks flow directly to ElevenLabs TTS. Post-stream state updates (sound cues, beat advancement, style tracking) run fire-and-forget after the SSE connection closes.
+2. **Single API route** — The only server-side route in the critical path is `/api/signed-url`, which exchanges the server-held `ELEVENLABS_API_KEY` for a short-lived signed URL. The browser SDK uses this URL to open the WebRTC session without exposing the API key.
 
-3. **[SOUND:x] markers** -- Mistral embeds sound cues in its text output. The webhook strips them before forwarding to TTS (so Elara does not say "SOUND colon door creak"). Cues are stored in session state and delivered to the client via polling.
+3. **Client-side state only** — All game state (elapsed time, phase, transcript, speaking state) lives in a React `useReducer`. There is no server polling, no session store, and no database. The session ends when the ElevenLabs WebRTC connection closes.
 
-4. **In-memory session store** -- Game sessions last 10-12 minutes max. A simple Map keyed by conversation_id is sufficient. Cold-start reset is acceptable for a hackathon.
+4. **Keyword-based sound cues** — Instead of having the LLM emit `[SOUND:x]` markers (which requires stripping before TTS), the client parses natural AI narration text against per-story regex rules. When Mistral says "the clock kept ticking", the client matches `\b(clock|tick|ticking)\b` and fires the clock sound. 30-second cooldowns prevent the same cue from retriggering on every utterance.
 
-5. **Dual Mistral models** -- Large for narration (creative, streaming), Small for intent classification (fast, cheap, async). The intent classifier runs post-stream so it never blocks voice output.
+5. **Deterministic timeline** — Ambient soundscape changes are authored as a time-based event list (e.g., "at t=420s, hard-stop the clock"). The timeline executor polls every 100ms against elapsed game time. This keeps horror pacing consistent regardless of what the player or AI says.
 
-6. **5-layer context** -- System prompt is assembled fresh each turn from world rules, character card, phase overrides, recent exchanges, compressed history, and live state snapshot. This keeps Mistral grounded in the story structure while allowing creative narration.
+6. **TTS ducking** — When ElevenLabs signals `isSpeaking = true`, the sound engine reduces all ambient channel volumes by -6dB over 300ms. When TTS ends, volumes restore over 600ms. This ensures Elara's voice is always intelligible without muting the atmosphere entirely.
+
+7. **3-second sound engine delay** — The `SoundEngine` initializes 3 seconds after the ElevenLabs session connects. Creating an `AudioContext` plus rendering 6-13 `OfflineAudioContext` buffers concurrently can starve the audio thread and cause the first WebRTC audio packet to fail. The delay gives ElevenLabs priority over the audio subsystem.
+
+8. **All sounds synthesized in-browser** — There are no audio files to serve or preload. Every ambient layer and one-shot cue is generated procedurally using `OfflineAudioContext` (filtered noise, oscillator drones, click transients). This eliminates CDN latency, keeps bundle size minimal, and allows the sound palette to be fully parameterized.

@@ -1,0 +1,47 @@
+Copyright (c) 2026 Akash Manmohan. All Rights Reserved.
+
+PROPRIETARY LICENSE
+
+This source code is made publicly available solely for evaluation,
+review, and demonstration purposes in connection with the Mistral
+Worldwide Hackathon 2026.
+
+NO PERMISSION IS GRANTED to:
+- Copy, reproduce, or duplicate this software or any portion thereof
+- Modify, adapt, or create derivative works based on this software
+- Distribute, sublicense, sell, or transfer this software to any third party
+- Use this software or any portion thereof in any commercial or non-commercial product
+- Deploy, host, or run this software on any server or service
+
+All intellectual property rights, including but not limited to copyrights,
+trademarks, trade secrets, and patents, remain exclusively with the author.
+
+Any unauthorized use, reproduction, or distribution of this software is
+strictly prohibited and may result in legal action.
+
+For licensing inquiries, contact the author directly.
+
+---
+
+ACKNOWLEDGMENTS AND CREDITS
+
+This project uses the following third-party technologies under their
+respective terms of service:
+
+- Mistral AI (https://mistral.ai) — Large language models for story
+  narration and intent classification. Mistral Large and Mistral Small
+  are products of Mistral AI.
+
+- ElevenLabs (https://elevenlabs.io) — Conversational AI platform for
+  real-time voice synthesis and speech-to-text via WebRTC.
+  ElevenLabs Conversational AI SDK is used under the ElevenLabs Terms
+  of Service.
+
+- Next.js (https://nextjs.org) — React framework by Vercel, used under
+  the MIT License.
+
+- Vercel (https://vercel.com) — Hosting and deployment platform.
+
+Use of open-source libraries and APIs is in accordance with their
+respective licenses and terms of service, as permitted by the Mistral
+Worldwide Hackathon 2026 rules.

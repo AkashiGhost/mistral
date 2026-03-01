@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Image from "next/image";
 import { motion } from "motion/react";
 import { FogLayer } from "@/components/ui/FogLayer";
@@ -11,7 +11,7 @@ import { STORIES, COMING_SOON_COUNT } from "@/lib/story-data";
 
 const CARD_HOVER_CSS = [
   ".story-card { border: 1px solid transparent; transition: border-color 0.3s ease; }",
-  ".story-card:hover { border-color: var(--accent); }",
+  ".story-card.playable:hover { border-color: var(--accent); }",
   ".story-card .card-hover { opacity: 0; transition: opacity 0.3s ease; }",
   ".story-card:hover .card-hover { opacity: 1; }",
   "@media (max-width: 1023px) { .story-card .card-hover { opacity: 1; } }",
@@ -20,10 +20,204 @@ const CARD_HOVER_CSS = [
   "@media (max-width: 767px) { .story-card { max-height: 65vh; } }",
   "@keyframes scroll-hint { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 0.6; transform: translateY(6px); } }",
   ".scroll-hint { animation: scroll-hint 2.5s ease-in-out infinite; }",
+  ".waitlist-input::placeholder { color: var(--muted); }",
+  ".waitlist-input:focus { outline: none; border-color: var(--accent) !important; }",
 ].join("\n");
+
+// ── Waitlist Modal ──────────────────────────────────────────────────────────
+
+function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim()) return;
+
+    // Persist to localStorage
+    const existing: string[] = JSON.parse(
+      localStorage.getItem("innerplay-waitlist") ?? "[]"
+    );
+    if (!existing.includes(email.trim())) {
+      existing.push(email.trim());
+      localStorage.setItem("innerplay-waitlist", JSON.stringify(existing));
+    }
+
+    setSubmitted(true);
+    setTimeout(() => {
+      setSubmitted(false);
+      setEmail("");
+      onClose();
+    }, 2000);
+  }
+
+  function handleClose() {
+    setEmail("");
+    setSubmitted(false);
+    onClose();
+  }
+
+  if (!open) return null;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Join waiting list"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 200,
+        background: "rgba(0,0,0,0.92)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "var(--space-sm)",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) handleClose();
+      }}
+    >
+      <div
+        style={{
+          position: "relative",
+          width: "100%",
+          maxWidth: 400,
+          background: "var(--black)",
+          border: "1px solid var(--muted)",
+          padding: "var(--space-lg)",
+          borderRadius: 0,
+        }}
+      >
+        {/* Close button */}
+        <button
+          onClick={handleClose}
+          aria-label="Close"
+          style={{
+            position: "absolute",
+            top: "var(--space-sm)",
+            right: "var(--space-sm)",
+            background: "transparent",
+            border: "none",
+            color: "var(--muted)",
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--type-ui)",
+            letterSpacing: "1px",
+            cursor: "pointer",
+            minHeight: 48,
+            minWidth: 48,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          CLOSE
+        </button>
+
+        {submitted ? (
+          <div
+            style={{
+              textAlign: "center",
+              padding: "var(--space-lg) 0",
+            }}
+          >
+            <p
+              style={{
+                fontFamily: "var(--font-literary)",
+                fontSize: "var(--type-title)",
+                color: "var(--white)",
+                fontStyle: "italic",
+                margin: 0,
+              }}
+            >
+              You&apos;re on the list.
+            </p>
+          </div>
+        ) : (
+          <>
+            <h2
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--type-title)",
+                color: "var(--white)",
+                letterSpacing: "2px",
+                margin: 0,
+                marginBottom: "var(--space-sm)",
+                lineHeight: 1,
+              }}
+            >
+              COMING SOON
+            </h2>
+            <p
+              style={{
+                fontFamily: "var(--font-literary)",
+                fontSize: "var(--type-body)",
+                color: "var(--muted)",
+                fontStyle: "italic",
+                margin: 0,
+                marginBottom: "var(--space-md)",
+                lineHeight: 1.6,
+              }}
+            >
+              This story isn&apos;t available yet. Join the waiting list to get
+              early access when we launch.
+            </p>
+
+            <form onSubmit={handleSubmit} noValidate>
+              <input
+                ref={inputRef}
+                className="waitlist-input"
+                type="email"
+                placeholder="your@email.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                style={{
+                  width: "100%",
+                  height: 48,
+                  background: "var(--black)",
+                  border: "1px solid var(--muted)",
+                  color: "var(--white)",
+                  fontFamily: "var(--font-ui)",
+                  fontSize: "var(--type-ui)",
+                  padding: "0 var(--space-sm)",
+                  borderRadius: 0,
+                  boxSizing: "border-box",
+                  marginBottom: "var(--space-sm)",
+                }}
+              />
+              <button
+                type="submit"
+                style={{
+                  width: "100%",
+                  height: 48,
+                  background: "transparent",
+                  border: "1px solid var(--accent)",
+                  color: "var(--accent)",
+                  fontFamily: "var(--font-display)",
+                  fontSize: "var(--type-ui)",
+                  letterSpacing: "2px",
+                  cursor: "pointer",
+                  borderRadius: 0,
+                }}
+              >
+                JOIN WAITLIST
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── Home ────────────────────────────────────────────────────────────────────
 
 export default function Home() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [waitlistOpen, setWaitlistOpen] = useState(false);
+
   const stories = STORIES.filter((s) => !s.comingSoon);
 
   return (
@@ -33,6 +227,8 @@ export default function Home() {
           __html: CARD_HOVER_CSS,
         }}
       />
+
+      <WaitlistModal open={waitlistOpen} onClose={() => setWaitlistOpen(false)} />
 
       <main id="main-content">
         {/* Section 1: Hero — full viewport */}
@@ -101,6 +297,7 @@ export default function Home() {
             >
               INNERPLAY
             </motion.h1>
+
             <motion.p
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -114,7 +311,26 @@ export default function Home() {
                 marginBlockStart: "var(--space-sm)",
               }}
             >
-              close your eyes
+              close your eyes. speak. play.
+            </motion.p>
+
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 1.6, ease: "easeOut" }}
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--type-ui)",
+                color: "var(--muted)",
+                margin: 0,
+                marginBlockStart: "var(--space-sm)",
+                maxWidth: 360,
+                lineHeight: 1.6,
+                opacity: 0.7,
+              }}
+            >
+              A new kind of game. No screen. No UI. Just your voice and your
+              imagination.
             </motion.p>
           </div>
 
@@ -194,102 +410,189 @@ export default function Home() {
               gap: "var(--space-md)",
             }}
           >
-            {stories.map((story, i) => (
-              <motion.div
-                key={story.id}
-                initial={{ opacity: 0, y: 30 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-50px" }}
-                transition={{ duration: 0.5, delay: i * 0.15 }}
-              >
-                <TransitionLink
-                  href={`/play?story=${story.id}`}
-                  style={{ display: "block", textDecoration: "none" }}
+            {stories.map((story, i) => {
+              const cardInner = (
+                <div
+                  className={`story-card${story.playable ? " playable" : ""}`}
+                  style={{
+                    position: "relative",
+                    aspectRatio:
+                      story.imageOrientation === "portrait"
+                        ? "2 / 3"
+                        : "16 / 9",
+                    overflow: "hidden",
+                    borderRadius: 0,
+                    background: "var(--black)",
+                    opacity: story.playable ? 1 : 0.6,
+                    cursor: story.playable ? "pointer" : "pointer",
+                  }}
                 >
+                  <Image
+                    src={story.image}
+                    alt={story.title}
+                    fill
+                    sizes="(max-width: 1023px) 100vw, 50vw"
+                    style={{ objectFit: "cover" }}
+                  />
                   <div
-                    className="story-card"
                     style={{
-                      position: "relative",
-                      aspectRatio:
-                        story.imageOrientation === "portrait"
-                          ? "2 / 3"
-                          : "16 / 9",
-                      overflow: "hidden",
-                      borderRadius: 0,
-                      background: "var(--black)",
+                      position: "absolute",
+                      inset: 0,
+                      background:
+                        "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent)",
                     }}
-                  >
-                    <Image
-                      src={story.image}
-                      alt={story.title}
-                      fill
-                      sizes="(max-width: 1023px) 100vw, 50vw"
-                      style={{ objectFit: "cover" }}
-                    />
+                  />
+
+                  {/* Lock badge for non-playable stories */}
+                  {!story.playable && (
                     <div
                       style={{
                         position: "absolute",
-                        inset: 0,
-                        background:
-                          "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.3) 40%, transparent)",
-                      }}
-                    />
-                    <div
-                      style={{
-                        position: "absolute",
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        padding: "var(--space-md)",
+                        top: "var(--space-sm)",
+                        right: "var(--space-sm)",
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
                       }}
                     >
-                      <h3
-                        style={{
-                          fontFamily: "var(--font-literary)",
-                          fontSize: "var(--type-title)",
-                          color: "var(--white)",
-                          fontWeight: 400,
-                          margin: 0,
-                          lineHeight: 1.3,
-                        }}
+                      <svg
+                        width="12"
+                        height="14"
+                        viewBox="0 0 12 14"
+                        fill="none"
+                        xmlns="http://www.w3.org/2000/svg"
+                        aria-hidden="true"
                       >
-                        {story.title}
-                      </h3>
-                      <p
-                        className="card-hover"
-                        style={{
-                          fontFamily: "var(--font-literary)",
-                          fontSize: "var(--type-body)",
-                          color: "var(--muted)",
-                          fontStyle: "italic",
-                          margin: 0,
-                          marginTop: "var(--space-xs)",
-                        }}
-                      >
-                        {story.hook}
-                      </p>
-                      <p
-                        className="card-hover"
+                        <rect
+                          x="1"
+                          y="6"
+                          width="10"
+                          height="7"
+                          rx="0.5"
+                          stroke="var(--muted)"
+                          strokeWidth="1.2"
+                        />
+                        <path
+                          d="M3.5 6V4a2.5 2.5 0 0 1 5 0v2"
+                          stroke="var(--muted)"
+                          strokeWidth="1.2"
+                          strokeLinecap="round"
+                        />
+                        <circle cx="6" cy="9.5" r="1" fill="var(--muted)" />
+                      </svg>
+                      <span
                         style={{
                           fontFamily: "var(--font-ui)",
                           fontSize: "var(--type-caption)",
                           color: "var(--muted)",
-                          margin: 0,
-                          marginTop: "var(--space-xs)",
+                          letterSpacing: "1px",
                         }}
                       >
-                        {story.genre} · {story.duration}
-                      </p>
+                        COMING SOON
+                      </span>
                     </div>
+                  )}
+
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      padding: "var(--space-md)",
+                    }}
+                  >
+                    <h3
+                      style={{
+                        fontFamily: "var(--font-literary)",
+                        fontSize: "var(--type-title)",
+                        color: "var(--white)",
+                        fontWeight: 400,
+                        margin: 0,
+                        lineHeight: 1.3,
+                      }}
+                    >
+                      {story.title}
+                    </h3>
+                    <p
+                      className="card-hover"
+                      style={{
+                        fontFamily: "var(--font-literary)",
+                        fontSize: "var(--type-body)",
+                        color: "var(--muted)",
+                        fontStyle: "italic",
+                        margin: 0,
+                        marginTop: "var(--space-xs)",
+                      }}
+                    >
+                      {story.hook}
+                    </p>
+                    <p
+                      className="card-hover"
+                      style={{
+                        fontFamily: "var(--font-ui)",
+                        fontSize: "var(--type-caption)",
+                        color: "var(--muted)",
+                        margin: 0,
+                        marginTop: "var(--space-xs)",
+                      }}
+                    >
+                      {story.genre} · {story.duration}
+                    </p>
                   </div>
-                </TransitionLink>
-              </motion.div>
-            ))}
+                </div>
+              );
+
+              return (
+                <motion.div
+                  key={story.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-50px" }}
+                  transition={{ duration: 0.5, delay: i * 0.15 }}
+                >
+                  {story.playable ? (
+                    <TransitionLink
+                      href={`/play?story=${story.id}`}
+                      style={{ display: "block", textDecoration: "none" }}
+                    >
+                      {cardInner}
+                    </TransitionLink>
+                  ) : (
+                    <div
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`${story.title} — coming soon. Join waiting list.`}
+                      onClick={() => setWaitlistOpen(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          setWaitlistOpen(true);
+                        }
+                      }}
+                      style={{ display: "block", textDecoration: "none" }}
+                    >
+                      {cardInner}
+                    </div>
+                  )}
+                </motion.div>
+              );
+            })}
 
             {/* Coming Soon placeholders */}
             {Array.from({ length: COMING_SOON_COUNT }).map((_, i) => (
               <div
                 key={`coming-soon-${i}`}
+                role="button"
+                tabIndex={0}
+                aria-label="More stories coming soon. Join waiting list."
+                onClick={() => setWaitlistOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setWaitlistOpen(true);
+                  }
+                }}
                 style={{
                   position: "relative",
                   aspectRatio: "16 / 9",
@@ -301,6 +604,7 @@ export default function Home() {
                   alignItems: "center",
                   justifyContent: "center",
                   gap: "var(--space-sm)",
+                  cursor: "pointer",
                 }}
               >
                 <svg
@@ -342,6 +646,59 @@ export default function Home() {
               </div>
             ))}
           </div>
+        </section>
+
+        {/* Section 3: Create Your Own */}
+        <section
+          style={{
+            padding: "var(--space-xl) var(--space-lg)",
+            background: "var(--black)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            textAlign: "center",
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--type-section)",
+              color: "var(--white)",
+              letterSpacing: "2px",
+              lineHeight: 1,
+              marginTop: 0,
+              marginBottom: "var(--space-xs)",
+            }}
+          >
+            CREATE YOUR OWN
+          </h2>
+          <p
+            style={{
+              fontFamily: "var(--font-literary)",
+              fontSize: "var(--type-body)",
+              color: "var(--muted)",
+              fontStyle: "italic",
+              margin: 0,
+              marginBottom: "var(--space-md)",
+            }}
+          >
+            Build your own interactive story. Coming soon.
+          </p>
+          <button
+            onClick={() => setWaitlistOpen(true)}
+            style={{
+              background: "transparent",
+              border: "1px solid var(--accent)",
+              color: "var(--accent)",
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--type-ui)",
+              letterSpacing: "2px",
+              height: 48,
+              padding: "0 var(--space-md)",
+              cursor: "pointer",
+              borderRadius: 0,
+            }}
+          >
+            JOIN WAITLIST
+          </button>
         </section>
 
         {/* Footer */}

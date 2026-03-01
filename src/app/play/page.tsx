@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback, useEffect, useRef } from "react";
+import { Suspense, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
 import { DEFAULT_STORY_ID } from "@/lib/constants";
@@ -16,34 +16,7 @@ function PlayContent() {
   const [onboardingDone, setOnboardingDone] = useState(false);
   const { status, startSession, errorMessage } = useGame();
 
-  // ── Mount logging ────────────────────────────────────────────
-  useEffect(() => {
-    console.log("[PLAY] PlayContent mounted");
-    return () => {
-      console.log("[PLAY] PlayContent unmounted");
-    };
-  }, []);
-
-  // ── Status change logging ────────────────────────────────────
-  const prevStatusRef = useRef(status);
-  useEffect(() => {
-    if (prevStatusRef.current !== status) {
-      console.log(`[PLAY] status changed: ${prevStatusRef.current} → ${status}`);
-      prevStatusRef.current = status;
-    }
-  }, [status]);
-
-  // ── onboardingDone change logging ────────────────────────────
-  const prevOnboardingRef = useRef(onboardingDone);
-  useEffect(() => {
-    if (prevOnboardingRef.current !== onboardingDone) {
-      console.log(`[PLAY] onboardingDone changed: ${prevOnboardingRef.current} → ${onboardingDone}`);
-      prevOnboardingRef.current = onboardingDone;
-    }
-  }, [onboardingDone]);
-
   const handleOnboardingComplete = useCallback(() => {
-    console.log(`[PLAY] Onboarding complete — calling startSession(storyId=${storyId})`);
     setOnboardingDone(true);
     void startSession(storyId);
   }, [startSession, storyId]);
@@ -54,7 +27,6 @@ function PlayContent() {
 
   // Connecting to ElevenLabs
   if (status === "connecting") {
-    console.log("[PLAY] Rendering: connecting screen");
     return (
       <div
         style={{
@@ -83,8 +55,6 @@ function PlayContent() {
   }
 
   if (status === "error") {
-    console.log("[PLAY] Rendering: error screen, message:", errorMessage);
-
     // Categorize the error for user-friendly display
     const msg = errorMessage?.toLowerCase() ?? "";
     let title = "Connection error";
@@ -197,14 +167,6 @@ function PlayContent() {
 }
 
 export default function PlayPage() {
-  // ── Page-level mount logging ─────────────────────────────────
-  useEffect(() => {
-    console.log("[PLAY] PlayPage mounted");
-    return () => {
-      console.log("[PLAY] PlayPage unmounted");
-    };
-  }, []);
-
   return (
     <ErrorBoundary>
       <GameProvider>

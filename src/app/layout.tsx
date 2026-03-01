@@ -19,13 +19,13 @@ const cormorantGaramond = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "InnerPlay — Voice-Based Immersive Games",
+  title: "InnerPlay — Interactive Storytelling You Experience With Your Eyes Closed",
   description:
-    "Close your eyes. Speak. Play. Real-time AI narration meets cinematic sound design in a voice-only immersive horror game powered by Mistral AI + ElevenLabs.",
+    "A new kind of game. No screen. No UI. Close your eyes, speak, and play inside your imagination. Voice-powered interactive storytelling powered by Mistral AI and ElevenLabs.",
   openGraph: {
-    title: "InnerPlay",
+    title: "InnerPlay — Interactive Storytelling You Experience With Your Eyes Closed",
     description:
-      "An AI therapist who knows too much. A lighthouse keeper at sea. A locked hospital room. Pick a story. Close your eyes.",
+      "A new kind of game. No screen. No UI. Close your eyes, speak, and play inside your imagination. Voice-powered interactive storytelling powered by Mistral AI and ElevenLabs.",
     url: "https://mistral-lac.vercel.app",
     siteName: "InnerPlay",
     type: "website",
@@ -40,9 +40,9 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "InnerPlay — Close Your Eyes. Speak. Play.",
+    title: "InnerPlay — Interactive Storytelling You Experience With Your Eyes Closed",
     description:
-      "Voice-only immersive horror games powered by Mistral AI. No screen. No UI. Just you, headphones, and your imagination.",
+      "Close your eyes. Speak. Play. A new kind of interactive storytelling you experience inside your imagination.",
   },
 };
 

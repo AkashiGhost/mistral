@@ -18,15 +18,8 @@ export function TransitionProvider({ children }: { children: ReactNode }) {
     (href: string) => {
       if (isTransitioning) return;
       setIsTransitioning(true);
-
-      // Curtain enters (500ms) → navigate → curtain exits
-      setTimeout(() => {
-        router.push(href);
-        // Let the new page load, then remove curtain
-        setTimeout(() => {
-          setIsTransitioning(false);
-        }, 100);
-      }, 500);
+      router.push(href);
+      setIsTransitioning(false);
     },
     [router, isTransitioning],
   );

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { motion } from "motion/react";
 import { BreathingDot } from "./BreathingDot";
+import { DEFAULT_STORY_ID } from "@/lib/constants";
 
 interface NavigationChromeProps {
   onMenuToggle: () => void;
@@ -32,7 +33,7 @@ export function NavigationChrome({
   const beginHref =
     variant === "landing"
       ? "#stories"
-      : "/play?story=the-last-session";
+      : `/play?story=${DEFAULT_STORY_ID}`;
 
   const delay = variant === "landing" ? 1.8 : 0;
 

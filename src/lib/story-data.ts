@@ -8,6 +8,7 @@ export interface StoryMeta {
   genre: string;
   featured: boolean;
   comingSoon: boolean;
+  playable: boolean;
 }
 
 export const STORIES: StoryMeta[] = [
@@ -21,6 +22,7 @@ export const STORIES: StoryMeta[] = [
     genre: "thriller",
     featured: true,
     comingSoon: false,
+    playable: true,
   },
   {
     id: "the-last-session",
@@ -32,6 +34,7 @@ export const STORIES: StoryMeta[] = [
     genre: "psychological horror",
     featured: false,
     comingSoon: false,
+    playable: false,
   },
   {
     id: "the-lighthouse",
@@ -43,6 +46,7 @@ export const STORIES: StoryMeta[] = [
     genre: "cosmic horror",
     featured: false,
     comingSoon: false,
+    playable: false,
   },
   {
     id: "room-4b",
@@ -54,6 +58,7 @@ export const STORIES: StoryMeta[] = [
     genre: "body horror",
     featured: false,
     comingSoon: false,
+    playable: false,
   },
 ];
 
@@ -64,5 +69,5 @@ export function getFeaturedStory(): StoryMeta {
 }
 
 export function getPlayableStories(): StoryMeta[] {
-  return STORIES.filter((s) => !s.comingSoon);
+  return STORIES.filter((s) => !s.comingSoon && s.playable);
 }
