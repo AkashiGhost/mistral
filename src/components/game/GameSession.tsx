@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { useSoundEngine } from "@/hooks/useSoundEngine";
 import { AtmosphereLayer } from "./AtmosphereLayer";
+import { ChoiceDisplay } from "./ChoiceDisplay";
+import { BreathingDot } from "@/components/ui/BreathingDot";
 
 // ─────────────────────────────────────────────
 // Game Session — Mistral / ElevenLabs version
@@ -15,14 +17,6 @@ import { AtmosphereLayer } from "./AtmosphereLayer";
 
 interface GameSessionProps {
   storyId: string;
-}
-
-// Phase → breathing CSS class mapping
-function getBreathingClass(phase: number): string {
-  if (phase >= 4) return "breathe-phase4";
-  if (phase >= 3) return "breathe-phase3";
-  if (phase >= 2) return "breathe-phase2";
-  return "breathe";
 }
 
 // Stories that show the AtmosphereLayer (fog/vignette)
@@ -141,16 +135,17 @@ export function GameSession({ storyId }: GameSessionProps) {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100dvh",
-          padding: "var(--space-8)",
+          backgroundColor: "var(--black)",
+          padding: "var(--space-md)",
           textAlign: "center",
-          gap: "var(--space-6)",
+          gap: "var(--space-md)",
         }}
       >
         <p
           style={{
-            color: "var(--color-text-secondary)",
-            fontSize: "var(--font-size-lg)",
-            fontFamily: "var(--font-body)",
+            color: "var(--muted)",
+            fontSize: "var(--type-lead)",
+            fontFamily: "var(--font-literary)",
             fontStyle: "italic",
             maxWidth: "32ch",
           }}
@@ -160,17 +155,37 @@ export function GameSession({ storyId }: GameSessionProps) {
         <a
           href="/"
           style={{
-            color: "var(--color-text-muted)",
-            fontSize: "var(--font-size-sm)",
+            color: "var(--muted)",
+            fontSize: "var(--type-caption)",
             fontFamily: "var(--font-ui)",
             opacity: 0.6,
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: "var(--touch-min)",
+            padding: "var(--space-xs) var(--space-sm)",
           }}
         >
-          Return home
+          return home
         </a>
       </div>
     );
   }
+
+  // ── Tap-to-reveal controls ──────────────────────────────────
+  const [showControls, setShowControls] = useState(false);
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (!showControls) return;
+    controlsTimerRef.current = setTimeout(() => setShowControls(false), 3000);
+    return () => {
+      if (controlsTimerRef.current) clearTimeout(controlsTimerRef.current);
+    };
+  }, [showControls]);
+
+  const handleMainAreaClick = () => {
+    setShowControls(true);
+  };
 
   return (
     <div
@@ -179,7 +194,7 @@ export function GameSession({ storyId }: GameSessionProps) {
         display: "flex",
         flexDirection: "column",
         minHeight: "100dvh",
-        backgroundColor: "var(--color-bg)",
+        backgroundColor: "var(--black)",
       }}
     >
       {/* Atmosphere layer — fog/vignette for stories that use it */}
@@ -187,14 +202,16 @@ export function GameSession({ storyId }: GameSessionProps) {
 
       {/* Main area — nearly blank during gameplay */}
       <div
+        onClick={handleMainAreaClick}
         style={{
           flex: 1,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          padding: "var(--space-8)",
+          padding: "var(--space-lg)",
           position: "relative",
           zIndex: 1,
+          cursor: "default",
         }}
       >
         <div
@@ -202,47 +219,23 @@ export function GameSession({ storyId }: GameSessionProps) {
             display: "flex",
             flexDirection: "column",
             alignItems: "center",
-            gap: "var(--space-3)",
+            gap: "var(--space-sm)",
           }}
         >
           {/* Breathing / speaking indicator — phase-aware animation */}
-          <div
-            className={isSpeaking ? "pulse" : getBreathingClass(phase)}
-            style={{
-              width: 12,
-              height: 12,
-              borderRadius: "var(--radius-full)",
-              backgroundColor: isSpeaking
-                ? "var(--color-accent)"
-                : "var(--color-accent-dim)",
-            }}
-          />
+          <BreathingDot size={12} phase={phase} isSpeaking={isSpeaking} />
           {status === "playing" && !hasElaraSpoken && (
             <p
               style={{
-                color: "var(--color-text-muted)",
-                fontSize: "var(--font-size-sm)",
-                fontFamily: "var(--font-body)",
+                color: "var(--muted)",
+                fontSize: "var(--type-ui)",
+                fontFamily: "var(--font-literary)",
                 fontStyle: "italic",
                 margin: 0,
                 opacity: 0.6,
               }}
             >
               preparing the session...
-            </p>
-          )}
-          {status === "playing" && hasElaraSpoken && (
-            <p
-              style={{
-                color: "var(--color-text-muted)",
-                fontSize: "var(--font-size-xs)",
-                fontFamily: "var(--font-ui)",
-                margin: 0,
-                opacity: 0.4,
-                letterSpacing: "0.06em",
-              }}
-            >
-              {isSpeaking ? "elara is speaking" : "listening..."}
             </p>
           )}
         </div>
@@ -252,10 +245,10 @@ export function GameSession({ storyId }: GameSessionProps) {
       {lastElaraText && (
         <div
           style={{
-            padding: "var(--space-4) var(--space-6)",
-            color: "var(--color-text-muted)",
-            fontSize: "var(--font-size-sm)",
-            fontFamily: "var(--font-body)",
+            padding: "var(--space-sm) var(--space-md)",
+            color: "var(--muted)",
+            fontSize: "var(--type-ui)",
+            fontFamily: "var(--font-literary)",
             fontStyle: "italic",
             textAlign: "center",
             maxHeight: "20vh",
@@ -265,6 +258,29 @@ export function GameSession({ storyId }: GameSessionProps) {
           {lastElaraText}
         </div>
       )}
+
+      {/* Choice overlay — voice-only choices rendered visually as fallback */}
+      {activeChoice && <ChoiceDisplay />}
+
+      {/* Screen reader transcript */}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: "hidden",
+          clip: "rect(0, 0, 0, 0)",
+          whiteSpace: "nowrap",
+          border: 0,
+        }}
+      >
+        {lastElaraText}
+      </div>
 
       {/* Pause overlay */}
       {isPaused && (
@@ -278,15 +294,15 @@ export function GameSession({ storyId }: GameSessionProps) {
             flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
-            gap: "var(--space-6)",
+            gap: "var(--space-md)",
             zIndex: 50,
           }}
         >
           <p
             style={{
-              color: "var(--color-text-secondary)",
-              fontSize: "var(--font-size-lg)",
-              fontFamily: "var(--font-body)",
+              color: "var(--muted)",
+              fontSize: "var(--type-body)",
+              fontFamily: "var(--font-literary)",
               fontStyle: "italic",
               margin: 0,
             }}
@@ -298,13 +314,13 @@ export function GameSession({ storyId }: GameSessionProps) {
             onClick={togglePause}
             style={{
               background: "none",
-              border: "1px solid var(--color-text-muted)",
-              color: "var(--color-text-primary)",
-              fontSize: "var(--font-size-base)",
+              border: "1px solid var(--muted)",
+              color: "var(--white)",
+              fontSize: "var(--type-body)",
               fontFamily: "var(--font-ui)",
               cursor: "pointer",
-              padding: "var(--space-3) var(--space-6)",
-              borderRadius: "var(--radius-md)",
+              padding: "var(--space-sm) var(--space-md)",
+              borderRadius: 0,
               letterSpacing: "0.04em",
               minHeight: 48,
               minWidth: 120,
@@ -315,55 +331,57 @@ export function GameSession({ storyId }: GameSessionProps) {
         </div>
       )}
 
-      {/* Bottom controls */}
-      <div
-        style={{
-          padding: "var(--space-3)",
-          textAlign: "center",
-          borderTop: "1px solid var(--color-bg-elevated)",
-          display: "flex",
-          justifyContent: "center",
-          gap: "var(--space-4)",
-        }}
-      >
-        <button
-          type="button"
-          onClick={togglePause}
+      {/* Tap-to-reveal bottom controls */}
+      {showControls && (
+        <div
+          className="fade-in"
           style={{
-            background: "none",
-            border: "none",
-            color: "var(--color-text-muted)",
-            fontSize: "0.65rem",
-            fontFamily: "var(--font-ui)",
-            cursor: "pointer",
-            opacity: 0.35,
-            padding: "var(--space-1)",
-            letterSpacing: "0.04em",
+            padding: "var(--space-sm)",
+            textAlign: "center",
+            display: "flex",
+            justifyContent: "center",
+            gap: "var(--space-md)",
           }}
         >
-          pause
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            console.log("[SESSION] User clicked 'end session' button");
-            void endSession();
-          }}
-          style={{
-            background: "none",
-            border: "none",
-            color: "var(--color-text-muted)",
-            fontSize: "0.65rem",
-            fontFamily: "var(--font-ui)",
-            cursor: "pointer",
-            opacity: 0.25,
-            padding: "var(--space-1)",
-            letterSpacing: "0.04em",
-          }}
-        >
-          end session
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={togglePause}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--muted)",
+              fontSize: "var(--type-caption)",
+              fontFamily: "var(--font-ui)",
+              cursor: "pointer",
+              opacity: 0.35,
+              padding: "var(--space-sm) var(--space-md)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            pause
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              console.log("[SESSION] User clicked 'end session' button");
+              void endSession();
+            }}
+            style={{
+              background: "none",
+              border: "none",
+              color: "var(--muted)",
+              fontSize: "var(--type-caption)",
+              fontFamily: "var(--font-ui)",
+              cursor: "pointer",
+              opacity: 0.25,
+              padding: "var(--space-sm) var(--space-md)",
+              letterSpacing: "0.04em",
+            }}
+          >
+            end session
+          </button>
+        </div>
+      )}
     </div>
   );
 }

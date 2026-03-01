@@ -6,6 +6,7 @@ import { GameProvider, useGame } from "@/context/GameContext";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
 import { GameSession } from "@/components/game/GameSession";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { BreathingDot } from "@/components/ui/BreathingDot";
 
 function PlayContent() {
   const searchParams = useSearchParams();
@@ -61,27 +62,20 @@ function PlayContent() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100dvh",
-          gap: "var(--space-3)",
+          gap: "var(--space-sm)",
         }}
       >
-        <div
-          className="breathe"
-          style={{
-            width: 10,
-            height: 10,
-            borderRadius: "var(--radius-full)",
-            backgroundColor: "var(--color-accent-dim)",
-          }}
-        />
+        <BreathingDot />
         <p
           style={{
-            color: "var(--color-text-muted)",
-            fontSize: "var(--font-size-sm)",
+            color: "var(--muted)",
+            fontSize: "var(--type-ui)",
+            fontFamily: "var(--font-literary)",
             fontStyle: "italic",
             margin: 0,
           }}
         >
-          Connecting...
+          preparing the session...
         </p>
       </div>
     );
@@ -98,26 +92,35 @@ function PlayContent() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100dvh",
-          gap: "var(--space-4)",
-          padding: "var(--space-8)",
+          gap: "var(--space-md)",
+          padding: "var(--space-lg)",
           textAlign: "center",
         }}
       >
-        <p style={{ color: "var(--color-danger)" }}>
+        <p style={{
+          color: "var(--error)",
+          fontFamily: "var(--font-literary)",
+          fontSize: "var(--type-body)",
+          fontStyle: "italic",
+        }}>
           {isQuotaError
             ? "Voice service quota exceeded. Please upgrade your ElevenLabs plan to continue."
             : "Connection lost. The session cannot continue."}
         </p>
         {errorMessage && (
-          <p style={{ color: "var(--color-text-muted)", fontSize: "var(--font-size-xs)" }}>
+          <p style={{ color: "var(--muted)", fontSize: "var(--type-caption)" }}>
             {errorMessage}
           </p>
         )}
         <a
           href="/"
           style={{
-            color: "var(--color-accent)",
-            fontSize: "var(--font-size-sm)",
+            color: "var(--muted)",
+            fontSize: "var(--type-ui)",
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: "var(--touch-min)",
+            padding: "var(--space-xs) var(--space-sm)",
           }}
         >
           Return home

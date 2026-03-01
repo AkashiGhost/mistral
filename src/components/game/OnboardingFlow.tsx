@@ -48,8 +48,16 @@ const STORY_ONBOARDING: Record<string, StoryOnboarding> = {
   "the-last-session": {
     scenes: [
       {
-        image: "/images/stories/the-last-session/card.webp",
+        image: "/images/stories/the-last-session/scene-1.png",
         text: "You are a therapist. It's late. Your last patient has arrived.",
+      },
+      {
+        image: "/images/stories/the-last-session/scene-2.png",
+        text: "She sits across from you. Something about her feels... familiar.",
+      },
+      {
+        image: "/images/stories/the-last-session/scene-3.png",
+        text: "The door locks behind her. The session has begun.",
       },
     ],
     firstAudioLine: "... Hello, Doctor. Thank you for seeing me tonight.",
@@ -132,7 +140,7 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
         style={{
           position: "fixed",
           inset: 0,
-          backgroundColor: "var(--color-bg)",
+          backgroundColor: "var(--black)",
           zIndex: 100,
           display: "flex",
           flexDirection: "column",
@@ -140,22 +148,23 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           justifyContent: "center",
         }}
       >
-        {/* Scene image */}
+        {/* Scene image — portrait 2:3 */}
         <div
           style={{
             position: "relative",
             width: "100%",
-            maxWidth: 600,
-            aspectRatio: "16 / 9",
+            maxWidth: 400,
+            aspectRatio: "2 / 3",
+            maxHeight: "calc(100dvh - 220px)",
             overflow: "hidden",
-            borderRadius: "var(--radius-md)",
+            borderRadius: 0,
           }}
         >
           <Image
             src={currentScene.image}
             alt=""
             fill
-            sizes="(max-width: 600px) 100vw, 600px"
+            sizes="(max-width: 400px) 100vw, 400px"
             style={{ objectFit: "cover" }}
             priority
           />
@@ -175,10 +184,10 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           style={{
             maxWidth: 480,
             textAlign: "center",
-            padding: "var(--space-6) var(--space-4)",
-            color: "var(--color-text-secondary)",
-            fontSize: "var(--font-size-lg)",
-            fontFamily: "var(--font-body)",
+            padding: "var(--space-md) var(--space-sm)",
+            color: "var(--muted)",
+            fontSize: "var(--type-body)",
+            fontFamily: "var(--font-literary)",
             fontStyle: "italic",
             lineHeight: 1.6,
             opacity: textOpacity,
@@ -204,14 +213,14 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
               style={{
                 background: "none",
                 border: "none",
-                color: "var(--color-text-muted)",
-                fontSize: "var(--font-size-sm)",
+                color: "var(--muted)",
+                fontSize: "var(--type-ui)",
                 fontFamily: "var(--font-ui)",
                 cursor: "pointer",
                 letterSpacing: "0.06em",
                 opacity: continueOpacity,
                 transition: "opacity 1s ease",
-                padding: "var(--space-2) var(--space-4)",
+                padding: "var(--space-xs) var(--space-sm)",
               }}
             >
               continue
@@ -224,9 +233,9 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           <div
             style={{
               position: "absolute",
-              bottom: "var(--space-6)",
+              bottom: "var(--space-md)",
               display: "flex",
-              gap: "var(--space-2)",
+              gap: "var(--space-xs)",
             }}
           >
             {onboarding.scenes.map((_, i) => (
@@ -235,11 +244,11 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
                 style={{
                   width: 6,
                   height: 6,
-                  borderRadius: "var(--radius-full)",
+                  borderRadius: "50%",
                   backgroundColor:
                     i <= sceneIndex
-                      ? "var(--color-accent)"
-                      : "var(--color-text-muted)",
+                      ? "var(--accent)"
+                      : "var(--muted)",
                   opacity: i <= sceneIndex ? 1 : 0.3,
                   transition: "var(--transition-normal)",
                 }}
@@ -263,62 +272,56 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: "var(--color-bg)",
+          backgroundColor: "var(--black)",
           zIndex: 100,
-          padding: "var(--space-8)",
+          padding: "var(--space-lg)",
           textAlign: "center",
         }}
       >
         <h2
           style={{
-            fontSize: "var(--font-size-2xl)",
+            fontSize: "var(--type-lead)",
             fontWeight: 400,
-            fontFamily: "var(--font-body)",
-            marginBottom: "var(--space-4)",
-            color: "var(--color-text-primary)",
+            fontFamily: "var(--font-display)",
+            marginBottom: "var(--space-sm)",
+            color: "var(--white)",
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
           }}
         >
-          Put on headphones
+          PUT ON HEADPHONES
         </h2>
         <p
           style={{
-            fontSize: "var(--font-size-lg)",
-            color: "var(--color-text-secondary)",
-            marginBottom: "var(--space-2)",
-            maxWidth: "28ch",
-          }}
-        >
-          Speak naturally. Listen closely.
-        </p>
-        <p
-          style={{
-            fontSize: "var(--font-size-sm)",
-            color: "var(--color-text-muted)",
-            marginBottom: "var(--space-8)",
-            maxWidth: "28ch",
+            fontSize: "var(--type-body)",
+            fontFamily: "var(--font-literary)",
             fontStyle: "italic",
+            color: "var(--muted)",
+            marginBottom: "var(--space-lg)",
+            maxWidth: "28ch",
           }}
         >
-          Close your eyes when the countdown ends.
+          speak naturally. listen closely.
         </p>
         <button
           type="button"
           onClick={advance}
           style={{
             minHeight: "var(--touch-min)",
-            padding: "var(--space-3) var(--space-8)",
-            border: "1px solid var(--color-accent-dim)",
-            borderRadius: "var(--radius-full)",
-            color: "var(--color-accent)",
-            fontSize: "var(--font-size-base)",
-            fontFamily: "var(--font-body)",
-            letterSpacing: "0.1em",
+            padding: "var(--space-sm) var(--space-lg)",
+            border: "none",
+            borderRadius: 0,
+            color: "var(--accent)",
+            fontSize: "var(--type-body)",
+            fontFamily: "var(--font-literary)",
+            letterSpacing: "0.05em",
             textTransform: "uppercase",
             transition: "var(--transition-normal)",
             backgroundColor: "transparent",
+            cursor: "pointer",
           }}
         >
-          Ready
+          Begin
         </button>
       </div>
     );
@@ -335,28 +338,29 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
         flexDirection: "column",
         alignItems: "center",
         justifyContent: "center",
-        backgroundColor: "var(--color-bg)",
+        backgroundColor: "var(--black)",
         zIndex: 100,
-        padding: "var(--space-8)",
+        padding: "var(--space-lg)",
         textAlign: "center",
       }}
     >
       <p
         style={{
-          fontSize: "var(--font-size-lg)",
-          color: "var(--color-text-secondary)",
-          marginBottom: "var(--space-6)",
-          fontFamily: "var(--font-body)",
+          fontSize: "var(--type-body)",
+          color: "var(--muted)",
+          marginBottom: "var(--space-md)",
+          fontFamily: "var(--font-literary)",
+          fontStyle: "italic",
         }}
       >
-        Close your eyes
+        close your eyes
       </p>
       <div
         style={{
-          fontSize: "var(--font-size-3xl)",
-          color: "var(--color-accent)",
-          fontFamily: "var(--font-body)",
-          fontWeight: 300,
+          fontSize: "var(--type-hero)",
+          color: "var(--accent)",
+          fontFamily: "var(--font-display)",
+          fontWeight: 400,
         }}
       >
         {countdown}

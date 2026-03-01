@@ -24,20 +24,41 @@ export class ErrorBoundary extends Component<Props, State> {
         <div style={{
           display: "flex", flexDirection: "column", alignItems: "center",
           justifyContent: "center", minHeight: "100dvh",
-          backgroundColor: "#0a0a0a", color: "#666", padding: "2rem", textAlign: "center",
+          backgroundColor: "var(--black)", color: "var(--muted)", padding: "var(--space-lg)", textAlign: "center",
         }}>
-          <p style={{ fontSize: "1rem", fontStyle: "italic", marginBottom: "1.5rem" }}>
+          <p style={{
+            fontSize: "var(--type-body)", fontFamily: "var(--font-literary)",
+            fontStyle: "italic", marginBottom: "var(--space-md)", color: "var(--error)",
+          }}>
             Something went wrong. Please refresh the page.
           </p>
           <button
             onClick={() => window.location.reload()}
             style={{
-              background: "none", border: "1px solid #333", color: "#888",
-              padding: "0.5rem 1.5rem", borderRadius: "4px", cursor: "pointer",
+              background: "none", border: "1px solid var(--muted)", color: "var(--muted)",
+              padding: "var(--space-xs) var(--space-md)", borderRadius: 0, cursor: "pointer",
+              fontFamily: "var(--font-ui)", fontSize: "var(--type-ui)",
+              minHeight: 48,
             }}
           >
             Refresh
           </button>
+          <a
+            href="/"
+            style={{
+              marginTop: "var(--space-sm)",
+              color: "var(--error)",
+              fontFamily: "var(--font-literary)",
+              fontSize: "var(--type-body)",
+              textDecoration: "none",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: 48,
+              padding: "8px 16px",
+            }}
+          >
+            return home
+          </a>
         </div>
       );
     }

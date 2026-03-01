@@ -1,0 +1,53 @@
+export interface StoryMeta {
+  id: string;
+  title: string;
+  hook: string;
+  image: string;
+  duration: string;
+  genre: string;
+  featured: boolean;
+  comingSoon: boolean;
+}
+
+export const STORIES: StoryMeta[] = [
+  {
+    id: "the-last-session",
+    title: "The Last Session",
+    hook: "Your last patient has arrived. She knows too much.",
+    image: "/images/stories/the-last-session/card.webp",
+    duration: "12 min",
+    genre: "psychological horror",
+    featured: true,
+    comingSoon: false,
+  },
+  {
+    id: "the-lighthouse",
+    title: "The Lighthouse",
+    hook: "A storm. A radio. A voice that knows your name.",
+    image: "/images/stories/the-lighthouse/card.webp",
+    duration: "10 min",
+    genre: "cosmic horror",
+    featured: false,
+    comingSoon: false,
+  },
+  {
+    id: "room-4b",
+    title: "Room 4B",
+    hook: "The door won't stay locked. The chart has your name.",
+    image: "/images/stories/room-4b/card.webp",
+    duration: "10 min",
+    genre: "body horror",
+    featured: false,
+    comingSoon: false,
+  },
+];
+
+export const COMING_SOON_COUNT = 2;
+
+export function getFeaturedStory(): StoryMeta {
+  return STORIES.find((s) => s.featured) ?? STORIES[0];
+}
+
+export function getPlayableStories(): StoryMeta[] {
+  return STORIES.filter((s) => !s.comingSoon);
+}

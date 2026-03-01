@@ -14,14 +14,45 @@ html {
 }
 
 body {
-  font-family: var(--font-body);
-  background-color: var(--color-bg);
-  color: var(--color-text-primary);
-  line-height: var(--line-height-normal);
+  font-family: var(--font-literary);
+  background: var(--black);
+  color: var(--white);
+  line-height: 1.55;
   min-height: 100dvh;
   overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Hide native cursor on desktop */
+@media (hover: hover) and (pointer: fine) {
+  body {
+    cursor: none;
+  }
+}
+
+/* Links */
+a {
+  color: var(--white);
+  text-decoration: none;
+}
+
+/* Button reset */
+button {
+  min-height: var(--touch-min);
+  min-width: var(--touch-min);
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  border-radius: 0;
+}
+
+/* Focus-visible */
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* Breathing animation for game session — phase-aware variants */
@@ -100,18 +131,30 @@ body {
   animation: fadeOut var(--transition-slow) forwards;
 }
 
-/* Mobile-first defaults */
-button {
-  min-height: var(--touch-min);
-  min-width: var(--touch-min);
-  cursor: pointer;
-  border: none;
-  background: none;
-  color: inherit;
-  font: inherit;
+/* Fog drift keyframes */
+@keyframes fog-drift-a {
+  0% { transform: translate(0%, 0%) scale(1); }
+  100% { transform: translate(5%, -3%) scale(1.02); }
 }
 
-a {
-  color: var(--color-accent);
-  text-decoration: none;
+@keyframes fog-drift-b {
+  0% { transform: translate(0%, 0%) scale(1); }
+  100% { transform: translate(-4%, 3%) scale(1.01); }
+}
+
+/* Fade up */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+  body { cursor: auto; }
+  .cursor-dot, .cursor-circle { display: none; }
 }

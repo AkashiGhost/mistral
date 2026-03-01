@@ -1,5 +1,22 @@
 import type { Metadata } from "next";
+import { Bebas_Neue, Cormorant_Garamond } from "next/font/google";
 import "@/styles/globals.css";
+import { TransitionProvider } from "@/context/TransitionContext";
+import { CustomCursor } from "@/components/ui/CustomCursor";
+
+const bebasNeue = Bebas_Neue({
+  subsets: ["latin"],
+  weight: "400",
+  variable: "--font-bebas-neue",
+  display: "swap",
+});
+
+const cormorantGaramond = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["300", "400"],
+  variable: "--font-cormorant-garamond",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "InnerPlay — Voice-Based Immersive Games",
@@ -35,8 +52,31 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body>{children}</body>
+    <html lang="en" className={`${bebasNeue.variable} ${cormorantGaramond.variable}`}>
+      <body>
+        <a
+          href="#main-content"
+          style={{
+            position: "absolute",
+            left: "-9999px",
+            top: "auto",
+            width: "1px",
+            height: "1px",
+            overflow: "hidden",
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.position = "static";
+            e.currentTarget.style.width = "auto";
+            e.currentTarget.style.height = "auto";
+          }}
+        >
+          Skip to content
+        </a>
+        <TransitionProvider>
+          <CustomCursor />
+          {children}
+        </TransitionProvider>
+      </body>
     </html>
   );
 }
