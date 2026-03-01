@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState } from "react";
 import Image from "next/image";
 import { motion } from "motion/react";
 import { FogLayer } from "@/components/ui/FogLayer";
@@ -10,7 +10,7 @@ import { TransitionLink } from "@/components/ui/TransitionLink";
 import { STORIES, COMING_SOON_COUNT } from "@/lib/story-data";
 
 const CARD_HOVER_CSS = [
-  ".story-card { border: 1px solid transparent; transition: border-color 0.3s ease; }",
+  ".story-card { border: 1px solid transparent; transition: border-color 0.3s ease; max-height: 520px; }",
   ".story-card.playable:hover { border-color: var(--accent); }",
   ".story-card .card-hover { opacity: 0; transition: opacity 0.3s ease; }",
   ".story-card:hover .card-hover { opacity: 1; }",
@@ -20,55 +20,22 @@ const CARD_HOVER_CSS = [
   "@media (max-width: 767px) { .story-card { max-height: 65vh; } }",
   "@keyframes scroll-hint { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 0.6; transform: translateY(6px); } }",
   ".scroll-hint { animation: scroll-hint 2.5s ease-in-out infinite; }",
-  ".waitlist-input::placeholder { color: var(--muted); opacity: 0.5; }",
-  ".waitlist-input:focus { outline: none; border-color: var(--accent) !important; }",
 ].join("\n");
 
 // ── Waitlist Modal ──────────────────────────────────────────────────────────
 
 function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [email, setEmail] = useState("");
-  const [submitted, setSubmitted] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  if (!open) return null;
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email.trim()) return;
+  // Replace with actual Google Form URL
+  const googleFormUrl = process.env.NEXT_PUBLIC_GOOGLE_FORM_URL || "";
 
-    // Always store locally as backup
-    const existing: string[] = JSON.parse(
-      localStorage.getItem("innerplay-waitlist") ?? "[]"
-    );
-    if (!existing.includes(email.trim())) {
-      existing.push(email.trim());
-      localStorage.setItem("innerplay-waitlist", JSON.stringify(existing));
+  function handleJoin() {
+    if (googleFormUrl) {
+      window.open(googleFormUrl, "_blank", "noopener,noreferrer");
     }
-
-    // Send to Formspree if configured (fire-and-forget)
-    const formspreeId = process.env.NEXT_PUBLIC_FORMSPREE_ID;
-    if (formspreeId) {
-      fetch(`https://formspree.io/f/${formspreeId}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), _subject: "InnerPlay Waitlist Signup" }),
-      }).catch(() => {}); // silent fail — localStorage has it
-    }
-
-    setSubmitted(true);
-    setTimeout(() => {
-      setSubmitted(false);
-      setEmail("");
-      onClose();
-    }, 2000);
-  }
-
-  function handleClose() {
-    setEmail("");
-    setSubmitted(false);
     onClose();
   }
-
-  if (!open) return null;
 
   return (
     <div
@@ -83,10 +50,10 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: "var(--space-sm)",
+        padding: "var(--space-md)",
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) handleClose();
+        if (e.target === e.currentTarget) onClose();
       }}
     >
       <div
@@ -98,11 +65,12 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
           border: "1px solid var(--muted)",
           padding: "56px 40px",
           borderRadius: 0,
+          textAlign: "center",
         }}
       >
         {/* Close button */}
         <button
-          onClick={handleClose}
+          onClick={onClose}
           aria-label="Close"
           style={{
             position: "absolute",
@@ -125,97 +93,64 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
           CLOSE
         </button>
 
-        {submitted ? (
-          <div
+        <h2
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "var(--type-lead)",
+            color: "var(--white)",
+            letterSpacing: "3px",
+            margin: 0,
+            marginBottom: "var(--space-md)",
+            lineHeight: 1,
+          }}
+        >
+          COMING SOON
+        </h2>
+        <p
+          style={{
+            fontFamily: "var(--font-literary)",
+            fontSize: "var(--type-title)",
+            color: "var(--muted)",
+            fontStyle: "italic",
+            margin: 0,
+            marginBottom: "var(--space-lg)",
+            lineHeight: 1.6,
+          }}
+        >
+          This story isn&apos;t available yet. Join the waiting list to be
+          first to play when we launch.
+        </p>
+
+        {googleFormUrl ? (
+          <button
+            onClick={handleJoin}
             style={{
-              textAlign: "center",
-              padding: "var(--space-lg) 0",
+              width: "100%",
+              height: 56,
+              background: "transparent",
+              border: "1px solid var(--accent)",
+              color: "var(--accent)",
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--type-body)",
+              letterSpacing: "3px",
+              cursor: "pointer",
+              borderRadius: 0,
             }}
           >
-            <p
-              style={{
-                fontFamily: "var(--font-literary)",
-                fontSize: "var(--type-lead)",
-                color: "var(--white)",
-                fontStyle: "italic",
-                margin: 0,
-              }}
-            >
-              You&apos;re on the list.
-            </p>
-          </div>
+            JOIN WAITLIST
+          </button>
         ) : (
-          <>
-            <h2
-              style={{
-                fontFamily: "var(--font-display)",
-                fontSize: "var(--type-lead)",
-                color: "var(--white)",
-                letterSpacing: "2px",
-                margin: 0,
-                marginBottom: "var(--space-md)",
-                lineHeight: 1,
-              }}
-            >
-              COMING SOON
-            </h2>
-            <p
-              style={{
-                fontFamily: "var(--font-literary)",
-                fontSize: "var(--type-title)",
-                color: "var(--muted)",
-                fontStyle: "italic",
-                margin: 0,
-                marginBottom: "var(--space-md)",
-                lineHeight: 1.6,
-              }}
-            >
-              This story isn&apos;t available yet. Join the waiting list to get
-              early access when we launch.
-            </p>
-
-            <form onSubmit={handleSubmit} noValidate>
-              <input
-                ref={inputRef}
-                className="waitlist-input"
-                type="email"
-                placeholder="your@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                style={{
-                  width: "100%",
-                  height: 56,
-                  background: "var(--black)",
-                  border: "1px solid var(--muted)",
-                  color: "var(--white)",
-                  fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-body)",
-                  padding: "0 var(--space-md)",
-                  borderRadius: 0,
-                  boxSizing: "border-box",
-                  marginBottom: "var(--space-sm)",
-                }}
-              />
-              <button
-                type="submit"
-                style={{
-                  width: "100%",
-                  height: 56,
-                  background: "transparent",
-                  border: "1px solid var(--accent)",
-                  color: "var(--accent)",
-                  fontFamily: "var(--font-display)",
-                  fontSize: "var(--type-body)",
-                  letterSpacing: "3px",
-                  cursor: "pointer",
-                  borderRadius: 0,
-                }}
-              >
-                JOIN WAITLIST
-              </button>
-            </form>
-          </>
+          <p
+            style={{
+              fontFamily: "var(--font-ui)",
+              fontSize: "var(--type-ui)",
+              color: "var(--muted)",
+              margin: 0,
+              opacity: 0.6,
+            }}
+          >
+            Waitlist opening soon. Stay tuned.
+          </p>
         )}
       </div>
     </div>
@@ -485,10 +420,7 @@ export default function Home() {
                   className={`story-card${story.playable ? " playable" : ""}`}
                   style={{
                     position: "relative",
-                    aspectRatio:
-                      story.imageOrientation === "portrait"
-                        ? "2 / 3"
-                        : "16 / 9",
+                    aspectRatio: "2 / 3",
                     overflow: "hidden",
                     borderRadius: 0,
                     background: "var(--black)",
@@ -664,7 +596,8 @@ export default function Home() {
                 }}
                 style={{
                   position: "relative",
-                  aspectRatio: "16 / 9",
+                  aspectRatio: "2 / 3",
+                  maxHeight: 520,
                   borderRadius: 0,
                   border: "1px dashed var(--muted)",
                   background: "var(--black)",
