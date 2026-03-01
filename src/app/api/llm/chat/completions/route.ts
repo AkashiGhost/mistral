@@ -444,18 +444,29 @@ async function performPostStreamUpdates(
     };
 
     // ── Advance beat + check phase transition ─────────────────────
+    // Don't advance past a choice beat until the player has resolved it.
+    // When a choice is pending (session.pendingChoice is set), the game
+    // holds on the current beat so the AI keeps presenting the choice
+    // until the player picks an option.
     const prevBeatIndex = nextState.currentBeatIndex;
     const prevPhaseIndex = nextState.currentPhaseIndex;
-    nextState = advanceBeat(config, nextState);
 
-    // If beats are exhausted in current phase, advance to next phase
-    // (mirrors game-orchestrator's checkPhaseTransition logic)
-    const beatAfterAdvance = getCurrentBeat(config, nextState);
-    if (!beatAfterAdvance) {
+    if (session.pendingChoice) {
       console.log(
-        `[WEBHOOK] Phase ${nextState.currentPhaseIndex} beats exhausted (beatIndex=${nextState.currentBeatIndex}) — transitioning to next phase`,
+        `[WEBHOOK] Beat NOT advanced — pendingChoice for beatId="${session.pendingChoice.beatId}" still unresolved`,
       );
-      nextState = advancePhase(config, nextState);
+    } else {
+      nextState = advanceBeat(config, nextState);
+
+      // If beats are exhausted in current phase, advance to next phase
+      // (mirrors game-orchestrator's checkPhaseTransition logic)
+      const beatAfterAdvance = getCurrentBeat(config, nextState);
+      if (!beatAfterAdvance) {
+        console.log(
+          `[WEBHOOK] Phase ${nextState.currentPhaseIndex} beats exhausted (beatIndex=${nextState.currentBeatIndex}) — transitioning to next phase`,
+        );
+        nextState = advancePhase(config, nextState);
+      }
     }
 
     const beatAdvanced =
@@ -464,9 +475,22 @@ async function performPostStreamUpdates(
       `[WEBHOOK] Beat advanced: ${beatAdvanced} — phase=${prevPhaseIndex}→${nextState.currentPhaseIndex}, beat=${prevBeatIndex}→${nextState.currentBeatIndex}`,
     );
 
-    // ── Check for ending (only in final phase — Phase 5, index 4) ──
-    // Ending conditions include a default fallback with empty trigger that always matches.
-    // Running this check in earlier phases would immediately end the game.
+    // ── Check for game end ─────────────────────────────────────────
+    // Two ways the game ends:
+    // 1. advancePhase() ran out of phases → state.status = "ended"
+    // 2. Final phase + ending condition matches → specific ending triggered
+    if (nextState.status === "ended") {
+      const endingId = evaluateEndingCondition(config, nextState) ?? "default";
+      console.log(`[WEBHOOK] Game status=ended (phases exhausted) — endingId="${endingId}", marking gameOver`);
+      nextState = { ...nextState, endingId };
+      updateSession(conversationId, {
+        state: nextState,
+        pendingSoundCues: cues.map((c) => ({ soundId: c.soundId, position: c.position })),
+        gameOver: true,
+      });
+      return;
+    }
+
     const isInFinalPhase = nextState.currentPhaseIndex >= config.arc.phases.length - 1;
     const endingId = isInFinalPhase ? evaluateEndingCondition(config, nextState) : null;
     if (endingId) {

@@ -325,8 +325,14 @@ export function calculateRevelationVariant(
   // Find dominant style with tie-break order
   const dominant = getDominantStyle(scores);
 
-  // Map to revelation variant
-  return revelationLogic[dominant] ?? revelationLogic[STYLE_TIE_BREAK_ORDER[0]] ?? "shadow_self";
+  // Handle nested mapping format: { trigger, source, mapping: { empathetic: "last_keeper" } }
+  // vs flat format: { empathetic: "last_keeper" }
+  const nested = (revelationLogic as Record<string, unknown>).mapping as
+    | Record<string, string>
+    | undefined;
+  const lookup = nested ?? revelationLogic;
+
+  return lookup[dominant] ?? lookup[STYLE_TIE_BREAK_ORDER[0]] ?? "shadow_self";
 }
 
 /** Get the dominant player style with tie-breaking */
@@ -349,13 +355,35 @@ export function evaluateEndingCondition(
   config: GameConfig,
   state: StoryState,
 ): string | null {
-  for (const condition of config.arc.endingConditions) {
-    if (matchesEndingTrigger(condition, state)) {
-      console.log(`[STATE] Ending check: result=${condition.id}`);
-      return condition.id;
+  const raw = config.arc.endingConditions;
+
+  // Standard array format (structured EndingCondition[] with trigger objects)
+  if (Array.isArray(raw)) {
+    for (const condition of raw) {
+      if (matchesEndingTrigger(condition, state)) {
+        console.log(`[STATE] Ending check: result=${condition.id}`);
+        return condition.id;
+      }
     }
+    console.log(`[STATE] Ending check: result=none`);
+    return null;
   }
-  console.log(`[STATE] Ending check: result=none`);
+
+  // Object/map format — story uses named endings like:
+  //   ending_conditions:
+  //     acceptance: { primary_path: "final_choice == 'accept'", ... }
+  // The final choice beat's state_changes sets flags.endingRoute to the ending name.
+  if (raw && typeof raw === "object") {
+    const endingRoute = state.flags["endingRoute"] as string | undefined;
+    if (endingRoute) {
+      console.log(`[STATE] Ending check (map format): endingRoute="${endingRoute}"`);
+      return endingRoute;
+    }
+    console.log(`[STATE] Ending check (map format): no endingRoute flag set yet`);
+    return null;
+  }
+
+  console.log(`[STATE] Ending check: result=none (no conditions)`);
   return null;
 }
 
