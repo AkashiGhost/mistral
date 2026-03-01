@@ -1,7 +1,7 @@
 "use client";
 
 interface BreathingDotProps {
-  size?: 10 | 12;
+  size?: number;
   phase?: number;
   isSpeaking?: boolean;
 }

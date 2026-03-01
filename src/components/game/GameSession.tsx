@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useGame } from "@/context/GameContext";
 import { useSoundEngine } from "@/hooks/useSoundEngine";
+import { stripSoundMarkers } from "@/lib/sound-cue-parser";
 import { AtmosphereLayer } from "./AtmosphereLayer";
-import { ChoiceDisplay } from "./ChoiceDisplay";
 import { BreathingDot } from "@/components/ui/BreathingDot";
 
 // ─────────────────────────────────────────────
@@ -14,6 +14,9 @@ import { BreathingDot } from "@/components/ui/BreathingDot";
 // AtmosphereLayer renders for stories with visual atmosphere (Room 4B).
 // Breathing dot adapts animation speed to current story phase.
 // ─────────────────────────────────────────────
+
+// Character name displayed in the transcript for AI messages
+const CHARACTER_NAME = "Elara";
 
 interface GameSessionProps {
   storyId: string;
@@ -30,14 +33,22 @@ export function GameSession({ storyId }: GameSessionProps) {
     isSpeaking,
     isPaused,
     hasAiSpoken,
-    activeChoice,
+    transcript,
     endSession,
     togglePause,
-    pendingSoundCues,
-    clearSoundCues,
   } = useGame();
 
   const showAtmosphere = ATMOSPHERE_STORIES.has(storyId);
+
+  // ── Responsive dot size: 12px mobile, 20px desktop (≥768px) ──────────
+  const [dotSize, setDotSize] = useState(12);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 768px)");
+    const update = (e: MediaQueryListEvent | MediaQueryList) => setDotSize(e.matches ? 20 : 12);
+    update(mq);
+    mq.addEventListener("change", update);
+    return () => mq.removeEventListener("change", update);
+  }, []);
 
   // ── Sound Engine — story-aware ambient sounds, timeline, TTS ducking ──
   useSoundEngine({
@@ -45,8 +56,8 @@ export function GameSession({ storyId }: GameSessionProps) {
     status,
     isSpeaking,
     isPaused,
-    pendingSoundCues,
-    clearSoundCues,
+    hasAiSpoken,
+    lastAiText,
   });
 
   // ── Mount / unmount logging ──────────────────────────────────
@@ -74,18 +85,6 @@ export function GameSession({ storyId }: GameSessionProps) {
       prevIsSpeakingRef.current = isSpeaking;
     }
   }, [isSpeaking]);
-
-  // ── activeChoice appear / disappear logging ──────────────────
-  const prevActiveChoiceRef = useRef(activeChoice);
-  useEffect(() => {
-    const prev = prevActiveChoiceRef.current;
-    prevActiveChoiceRef.current = activeChoice;
-    if (!prev && activeChoice) {
-      console.log(`[SESSION] activeChoice appeared — beatId=${activeChoice.beatId}, options=[${activeChoice.options.map((o) => o.id).join(", ")}]`);
-    } else if (prev && !activeChoice) {
-      console.log(`[SESSION] activeChoice cleared (beatId=${prev.beatId})`);
-    }
-  }, [activeChoice]);
 
   // ── hasAiSpoken change logging ────────────────────────────
   const prevHasAiSpokenRef = useRef(hasAiSpoken);
@@ -124,6 +123,12 @@ export function GameSession({ storyId }: GameSessionProps) {
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lastAiText]);
+
+  // ── Transcript scroll — auto-scroll to latest message ───────────────
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [transcript]);
 
   if (status === "ended") {
     return (
@@ -223,12 +228,12 @@ export function GameSession({ storyId }: GameSessionProps) {
           }}
         >
           {/* Breathing / speaking indicator — phase-aware animation */}
-          <BreathingDot size={12} phase={phase} isSpeaking={isSpeaking} />
+          <BreathingDot size={dotSize} phase={phase} isSpeaking={isSpeaking} />
           {status === "playing" && !hasAiSpoken && (
             <p
               style={{
                 color: "var(--muted)",
-                fontSize: "var(--type-ui)",
+                fontSize: "var(--type-body)",
                 fontFamily: "var(--font-literary)",
                 fontStyle: "italic",
                 margin: 0,
@@ -238,29 +243,89 @@ export function GameSession({ storyId }: GameSessionProps) {
               preparing the session...
             </p>
           )}
+          {/* "tap anywhere" hint — only visible when controls are hidden */}
+          {status === "playing" && hasAiSpoken && !showControls && (
+            <p
+              style={{
+                color: "var(--muted)",
+                fontSize: "var(--type-ui)",
+                fontFamily: "var(--font-ui)",
+                margin: 0,
+                opacity: 0.3,
+                letterSpacing: "0.06em",
+                textTransform: "uppercase",
+                marginTop: "var(--space-lg)",
+              }}
+            >
+              tap anywhere for controls
+            </p>
+          )}
         </div>
       </div>
 
-      {/* AI character's last text — subtle, for accessibility */}
-      {lastAiText && (
+      {/* Scrolling transcript overlay — bottom portion of screen */}
+      {transcript.length > 0 && (
         <div
           style={{
+            position: "relative",
+            zIndex: 2,
+            maxHeight: "40vh",
+            overflowY: "auto",
+            backgroundColor: "rgba(0, 0, 0, 0.72)",
+            borderTop: "1px solid rgba(255, 255, 255, 0.06)",
             padding: "var(--space-sm) var(--space-md)",
-            color: "var(--muted)",
-            fontSize: "var(--type-ui)",
-            fontFamily: "var(--font-literary)",
-            fontStyle: "italic",
-            textAlign: "center",
-            maxHeight: "20vh",
-            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+            gap: "var(--space-xs)",
+            scrollbarWidth: "thin",
+            scrollbarColor: "rgba(255,255,255,0.12) transparent",
           }}
         >
-          {lastAiText}
+          {transcript.map((entry, idx) => {
+            const isUser = entry.source === "user";
+            return (
+              <div
+                key={idx}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: isUser ? "flex-end" : "flex-start",
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: "var(--type-caption)",
+                    fontFamily: "var(--font-ui)",
+                    color: "var(--muted)",
+                    opacity: 0.55,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    marginBottom: 2,
+                  }}
+                >
+                  {isUser ? "You" : CHARACTER_NAME}
+                </span>
+                <p
+                  style={{
+                    margin: 0,
+                    maxWidth: "72ch",
+                    fontSize: "var(--type-ui)",
+                    fontFamily: "var(--font-literary)",
+                    fontStyle: isUser ? "normal" : "italic",
+                    lineHeight: 1.55,
+                    color: isUser ? "var(--muted)" : "var(--white)",
+                    textAlign: isUser ? "right" : "left",
+                  }}
+                >
+                  {entry.source === "ai" ? stripSoundMarkers(entry.text) : entry.text}
+                </p>
+              </div>
+            );
+          })}
+          {/* Anchor for auto-scroll to bottom */}
+          <div ref={transcriptEndRef} />
         </div>
       )}
-
-      {/* Choice overlay — voice-only choices rendered visually as fallback */}
-      {activeChoice && <ChoiceDisplay />}
 
       {/* Screen reader transcript */}
       <div
@@ -336,11 +401,11 @@ export function GameSession({ storyId }: GameSessionProps) {
         <div
           className="fade-in"
           style={{
-            padding: "var(--space-sm)",
+            padding: "var(--space-md)",
             textAlign: "center",
             display: "flex",
             justifyContent: "center",
-            gap: "var(--space-md)",
+            gap: "var(--space-lg)",
           }}
         >
           <button
@@ -348,14 +413,17 @@ export function GameSession({ storyId }: GameSessionProps) {
             onClick={togglePause}
             style={{
               background: "none",
-              border: "none",
+              border: "1px solid var(--muted)",
               color: "var(--muted)",
-              fontSize: "var(--type-caption)",
+              fontSize: "var(--type-body)",
               fontFamily: "var(--font-ui)",
               cursor: "pointer",
-              opacity: 0.35,
+              opacity: 0.7,
               padding: "var(--space-sm) var(--space-md)",
               letterSpacing: "0.04em",
+              minHeight: "var(--touch-min)",
+              minWidth: 100,
+              borderRadius: 0,
             }}
           >
             pause
@@ -368,14 +436,17 @@ export function GameSession({ storyId }: GameSessionProps) {
             }}
             style={{
               background: "none",
-              border: "none",
+              border: "1px solid var(--muted)",
               color: "var(--muted)",
-              fontSize: "var(--type-caption)",
+              fontSize: "var(--type-body)",
               fontFamily: "var(--font-ui)",
               cursor: "pointer",
-              opacity: 0.25,
+              opacity: 0.55,
               padding: "var(--space-sm) var(--space-md)",
               letterSpacing: "0.04em",
+              minHeight: "var(--touch-min)",
+              minWidth: 130,
+              borderRadius: 0,
             }}
           >
             end session

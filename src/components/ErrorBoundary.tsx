@@ -20,6 +20,7 @@ export class ErrorBoundary extends Component<Props, State> {
 
   render() {
     if (this.state.hasError) {
+      const errorMsg = this.state.error?.message ?? "Unknown error";
       return (
         <div style={{
           display: "flex", flexDirection: "column", alignItems: "center",
@@ -28,9 +29,16 @@ export class ErrorBoundary extends Component<Props, State> {
         }}>
           <p style={{
             fontSize: "var(--type-body)", fontFamily: "var(--font-literary)",
-            fontStyle: "italic", marginBottom: "var(--space-md)", color: "var(--error)",
+            fontStyle: "italic", marginBottom: "var(--space-sm)", color: "var(--error)",
           }}>
-            Something went wrong. Please refresh the page.
+            Something went wrong.
+          </p>
+          <p style={{
+            fontSize: "var(--type-caption)", fontFamily: "var(--font-ui)",
+            color: "var(--muted)", marginBottom: "var(--space-md)",
+            maxWidth: "500px", wordBreak: "break-word",
+          }}>
+            {errorMsg}
           </p>
           <button
             onClick={() => window.location.reload()}

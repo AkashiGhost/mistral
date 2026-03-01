@@ -9,6 +9,7 @@ import { useEffect, useRef, useCallback } from "react";
 import { SoundEngine } from "@/lib/sound-engine";
 import { generateSoundsForStory } from "@/lib/synth-sounds";
 import type { TimelineEvent as SoundTimelineEvent } from "@/lib/sound-engine";
+import { parseSoundCues } from "@/lib/sound-cue-parser";
 
 // ─────────────────────────────────────────────
 // Story-specific timelines
@@ -67,6 +68,33 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
     // Phase 5: Everything fades
     { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 15 },
   ],
+
+  "the-call": [
+    // ── Ringing phase (t=0 to ~t=4) ──────────────────────────
+    // Phone ring plays once — 6s buffer: 2s ring ON then 4s silence
+    { time: 0, action: "play_once", soundIds: ["phone_ring"] },
+    // Phone static starts looping immediately but at near-inaudible volume
+    // (gives the impression the line is already connected, waiting behind the ring)
+    { time: 0, action: "start_ambient", soundIds: ["phone_static"] },
+    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.03, fadeDurationSeconds: 0 },
+
+    // ── Pickup ────────────────────────────────────────────────
+    // pickup_click is now event-driven (fires when AI first speaks, see useSoundEngine)
+    // Electrical hum starts — signals call has connected
+    { time: 4.2, action: "start_ambient", soundIds: ["electrical_hum"] },
+    // Static swells up to normal call volume over 2s (call connecting feel)
+    { time: 4.2, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.15, fadeDurationSeconds: 2 },
+
+    // ── Mid-game tension ──────────────────────────────────────
+    // Sub bass creeps in after a couple minutes
+    { time: 120, action: "fade_in", soundIds: ["sub_bass"], fadeInSeconds: 10 },
+    // Static intensifies slightly mid-game (line degrading, situation escalating)
+    { time: 300, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.5, fadeDurationSeconds: 8 },
+
+    // ── Ending ────────────────────────────────────────────────
+    // Everything fades toward the end
+    { time: 540, action: "fade_all_to_nothing", fadeDurationSeconds: 15 },
+  ],
 };
 
 // Story-specific spatial panning
@@ -94,6 +122,21 @@ const SPATIAL_MAPS: Record<string, Record<string, { pan: number }>> = {
     sub_bass: { pan: 0 },
     low_tone: { pan: 0 },
   },
+  "the-call": {
+    phone_static: { pan: 0 },      // centered (phone audio)
+    electrical_hum: { pan: 0 },    // centered
+    sub_bass: { pan: 0 },          // centered
+    phone_ring: { pan: 0 },        // centered
+    pickup_click: { pan: 0 },      // centered
+    disconnect_tone: { pan: 0 },   // centered (all phone sounds are mono/centered)
+    footsteps: { pan: -0.2 },      // slightly left (Alex moving)
+    water_drip: { pan: 0.3 },      // off to the right (environmental)
+    door_creak: { pan: -0.1 },     // slightly left
+    keypad_beep: { pan: 0 },       // centered (close interaction)
+    metal_scrape: { pan: 0.2 },    // slight right (vent above)
+    pipe_clank: { pan: 0.4 },      // right wall (pipes on right wall per story)
+    heavy_breathing: { pan: 0 },   // centered (Alex's own breathing)
+  },
 };
 
 interface UseSoundEngineOptions {
@@ -101,8 +144,8 @@ interface UseSoundEngineOptions {
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   isSpeaking: boolean;
   isPaused: boolean;
-  pendingSoundCues: Array<{ soundId: string; position: number }>;
-  clearSoundCues: () => void;
+  hasAiSpoken: boolean;
+  lastAiText: string;
 }
 
 export function useSoundEngine({
@@ -110,11 +153,16 @@ export function useSoundEngine({
   status,
   isSpeaking,
   isPaused,
-  pendingSoundCues,
-  clearSoundCues,
+  hasAiSpoken,
+  lastAiText,
 }: UseSoundEngineOptions) {
   const engineRef = useRef<SoundEngine | null>(null);
   const initStartedRef = useRef(false);
+  // Tracks whether we've already fired the phone-pickup sequence for "the-call"
+  const hasPickedUpRef = useRef(false);
+  // Tracks cooldowns for keyword-triggered sound cues (soundId → timestamp)
+  const cueCooldownsRef = useRef<Map<string, number>>(new Map());
+  const CUE_COOLDOWN_MS = 30_000; // 30 seconds between same sound cue re-triggers
 
   // ── Initialize engine when game starts playing ────────────
   useEffect(() => {
@@ -170,6 +218,49 @@ export function useSoundEngine({
     }
   }, [isSpeaking]);
 
+  // ── Phone pickup — stop ring when AI first speaks ─────
+  // Only active for "the-call" story.
+  // Fires once: when isSpeaking transitions true AND hasAiSpoken was false
+  // (i.e. this is the very first time the AI speaks).
+  useEffect(() => {
+    if (storyId !== "the-call") return;
+    if (!isSpeaking) return;
+    if (hasAiSpoken) return; // already spoken before this render — not the first time
+    if (hasPickedUpRef.current) return; // already fired
+
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    hasPickedUpRef.current = true;
+    console.log("[USE-SOUND] AI first speak detected — stopping phone_ring, playing pickup_click");
+    engine.stop("phone_ring", 0); // hard stop — ring cuts immediately
+    engine.play("pickup_click", 0.9, false); // one-shot click
+  }, [isSpeaking, hasAiSpoken, storyId]);
+
+  // ── Keyword-based reactive sound cues ─────────────────
+  // Parse AI narration text for keywords that match story sounds.
+  // Triggers one-shot cues via triggerCue() with a per-sound cooldown.
+  useEffect(() => {
+    if (!lastAiText || status !== "playing") return;
+    const engine = engineRef.current;
+    if (!engine) return;
+
+    const cues = parseSoundCues(lastAiText, storyId);
+    const now = Date.now();
+    const cooldowns = cueCooldownsRef.current;
+
+    for (const cue of cues) {
+      const lastFired = cooldowns.get(cue.soundId) ?? 0;
+      if (now - lastFired < CUE_COOLDOWN_MS) {
+        console.log(`[USE-SOUND] Cue cooldown active for "${cue.soundId}" — skipping`);
+        continue;
+      }
+      cooldowns.set(cue.soundId, now);
+      console.log(`[USE-SOUND] Keyword cue triggered: "${cue.soundId}" (volume=${cue.volume})`);
+      engine.triggerCue(cue.soundId, cue.volume);
+    }
+  }, [lastAiText, storyId, status]);
+
   // ── Pause / Resume ────────────────────────────────────
   useEffect(() => {
     const engine = engineRef.current;
@@ -180,17 +271,6 @@ export function useSoundEngine({
       engine.resumeAudio();
     }
   }, [isPaused]);
-
-  // ── Process pending sound cues ────────────────────────
-  useEffect(() => {
-    const engine = engineRef.current;
-    if (!engine || pendingSoundCues.length === 0) return;
-    for (const cue of pendingSoundCues) {
-      console.log(`[USE-SOUND] Triggering cue: ${cue.soundId}`);
-      engine.triggerCue(cue.soundId);
-    }
-    clearSoundCues();
-  }, [pendingSoundCues, clearSoundCues]);
 
   // ── Cleanup on game end ───────────────────────────────
   useEffect(() => {

@@ -1,24 +1,9 @@
 import { NextResponse } from "next/server";
-import { STORY_IDS, getGameConfig } from "@/lib/config-loader";
+import { STORY_IDS } from "@/lib/constants";
 
 export const runtime = "nodejs";
 
 export async function GET() {
-  const stories: Record<string, string> = {};
-  for (const id of STORY_IDS) {
-    try {
-      const config = getGameConfig(id);
-      const phases = config.arc.phases.length;
-      const beats = config.arc.phases.reduce(
-        (sum, p) => sum + (p.beats?.length ?? 0),
-        0,
-      );
-      stories[id] = `${phases} phases, ${beats} beats`;
-    } catch {
-      stories[id] = "failed to load";
-    }
-  }
-
   return NextResponse.json({
     status: "ok",
     timestamp: new Date().toISOString(),
@@ -29,6 +14,6 @@ export async function GET() {
         ? "configured"
         : "missing",
     },
-    stories,
+    stories: STORY_IDS,
   });
 }

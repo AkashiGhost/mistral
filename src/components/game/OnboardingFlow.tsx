@@ -19,6 +19,23 @@ interface StoryOnboarding {
 }
 
 const STORY_ONBOARDING: Record<string, StoryOnboarding> = {
+  "the-call": {
+    scenes: [
+      {
+        image: "/images/stories/the-call/scene-1.png",
+        text: "Your phone rings. An unknown number. You answer.",
+      },
+      {
+        image: "/images/stories/the-call/scene-2.png",
+        text: "On the other end — someone trapped in a concrete room underground. They need your help to escape.",
+      },
+      {
+        image: "/images/stories/the-call/scene-3.png",
+        text: "'Please don't hang up. I don't know where I am.' Guide them out. Your voice is all they have.",
+      },
+    ],
+    firstAudioLine: "Hello?? Oh god, someone picked up. Please — please don't hang up.",
+  },
   "the-lighthouse": {
     scenes: [
       {
@@ -69,7 +86,7 @@ type OnboardingStep = "scene" | "headphones" | "countdown";
 
 interface OnboardingFlowProps {
   storyId: string;
-  onComplete: (firstMessage: string) => void;
+  onComplete: () => void;
 }
 
 export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
@@ -114,12 +131,12 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   useEffect(() => {
     if (step !== "countdown") return;
     if (countdown <= 0) {
-      onComplete(onboarding.firstAudioLine);
+      onComplete();
       return;
     }
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     return () => clearTimeout(timer);
-  }, [step, countdown, onComplete, onboarding.firstAudioLine]);
+  }, [step, countdown, onComplete]);
 
   const advance = useCallback(() => {
     if (step === "scene") {

@@ -42,10 +42,10 @@ function PlayContent() {
     }
   }, [onboardingDone]);
 
-  const handleOnboardingComplete = useCallback((firstMessage: string) => {
-    console.log(`[PLAY] Onboarding complete — calling startSession(storyId=${storyId}, firstMessage="${firstMessage.slice(0, 60)}…")`);
+  const handleOnboardingComplete = useCallback(() => {
+    console.log(`[PLAY] Onboarding complete — calling startSession(storyId=${storyId})`);
     setOnboardingDone(true);
-    void startSession(storyId, firstMessage);
+    void startSession(storyId);
   }, [startSession, storyId]);
 
   if (!onboardingDone) {
@@ -83,8 +83,35 @@ function PlayContent() {
   }
 
   if (status === "error") {
-    console.log("[PLAY] Rendering: error screen");
-    const isQuotaError = errorMessage?.toLowerCase().includes("quota");
+    console.log("[PLAY] Rendering: error screen, message:", errorMessage);
+
+    // Categorize the error for user-friendly display
+    const msg = errorMessage?.toLowerCase() ?? "";
+    let title = "Connection error";
+    let detail = errorMessage ?? "The session could not start.";
+    let hint = "";
+
+    if (msg.includes("quota")) {
+      title = "Quota exceeded";
+      detail = "The ElevenLabs voice service quota has been exceeded.";
+      hint = "Upgrade the ElevenLabs plan or wait for quota reset.";
+    } else if (msg.includes("500") || msg.includes("server")) {
+      title = "Server error (500)";
+      hint = "Check that the ElevenLabs agent is configured with the correct Server URL and API key.";
+    } else if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("api key")) {
+      title = "Authentication failed";
+      hint = "The ElevenLabs API key may be invalid or expired. Update ELEVENLABS_API_KEY in your environment.";
+    } else if (msg.includes("agent") && msg.includes("not found")) {
+      title = "Agent not found";
+      hint = "Check that NEXT_PUBLIC_ELEVENLABS_AGENT_ID matches a valid agent in your ElevenLabs dashboard.";
+    } else if (msg.includes("microphone")) {
+      title = "Microphone blocked";
+      hint = "Allow microphone access in your browser settings, then refresh.";
+    } else if (msg.includes("missing elevenlabs")) {
+      title = "Missing configuration";
+      hint = "Set NEXT_PUBLIC_ELEVENLABS_AGENT_ID and ELEVENLABS_API_KEY in your environment variables.";
+    }
+
     return (
       <div
         style={{
@@ -93,39 +120,75 @@ function PlayContent() {
           alignItems: "center",
           justifyContent: "center",
           minHeight: "100dvh",
-          gap: "var(--space-md)",
+          gap: "var(--space-sm)",
           padding: "var(--space-lg)",
           textAlign: "center",
         }}
       >
         <p style={{
           color: "var(--error)",
+          fontFamily: "var(--font-display)",
+          fontSize: "var(--type-section)",
+          letterSpacing: "0.05em",
+          textTransform: "uppercase",
+          margin: 0,
+        }}>
+          {title}
+        </p>
+        <p style={{
+          color: "var(--muted)",
           fontFamily: "var(--font-literary)",
           fontSize: "var(--type-body)",
           fontStyle: "italic",
+          maxWidth: "500px",
+          wordBreak: "break-word",
+          margin: 0,
         }}>
-          {isQuotaError
-            ? "Voice service quota exceeded. Please upgrade your ElevenLabs plan to continue."
-            : "Connection lost. The session cannot continue."}
+          {detail}
         </p>
-        {errorMessage && (
-          <p style={{ color: "var(--muted)", fontSize: "var(--type-caption)" }}>
-            {errorMessage}
+        {hint && (
+          <p style={{
+            color: "var(--accent)",
+            fontFamily: "var(--font-ui)",
+            fontSize: "var(--type-caption)",
+            maxWidth: "440px",
+            margin: 0,
+          }}>
+            {hint}
           </p>
         )}
-        <a
-          href="/"
-          style={{
-            color: "var(--muted)",
-            fontSize: "var(--type-ui)",
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: "var(--touch-min)",
-            padding: "var(--space-xs) var(--space-sm)",
-          }}
-        >
-          Return home
-        </a>
+        <div style={{ display: "flex", gap: "var(--space-md)", marginTop: "var(--space-sm)" }}>
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            style={{
+              background: "none",
+              border: "1px solid var(--muted)",
+              color: "var(--muted)",
+              padding: "var(--space-xs) var(--space-md)",
+              borderRadius: 0,
+              cursor: "pointer",
+              fontFamily: "var(--font-ui)",
+              fontSize: "var(--type-ui)",
+              minHeight: "var(--touch-min)",
+            }}
+          >
+            Retry
+          </button>
+          <a
+            href="/"
+            style={{
+              color: "var(--muted)",
+              fontSize: "var(--type-ui)",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: "var(--touch-min)",
+              padding: "var(--space-xs) var(--space-sm)",
+            }}
+          >
+            Return home
+          </a>
+        </div>
       </div>
     );
   }

@@ -4,8 +4,8 @@
 // ─────────────────────────────────────────────
 
 /** Valid story IDs — must match directory names under stories/ */
-export const STORY_IDS = ["the-last-session", "the-lighthouse", "room-4b"] as const;
+export const STORY_IDS = ["the-last-session", "the-lighthouse", "room-4b", "the-call"] as const;
 export type StoryId = (typeof STORY_IDS)[number];
 
 /** Default story used when no storyId is specified */
-export const DEFAULT_STORY_ID: StoryId = "the-last-session";
+export const DEFAULT_STORY_ID: StoryId = "the-call";

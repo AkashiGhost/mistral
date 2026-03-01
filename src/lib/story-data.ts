@@ -12,6 +12,17 @@ export interface StoryMeta {
 
 export const STORIES: StoryMeta[] = [
   {
+    id: "the-call",
+    title: "The Call",
+    hook: "A stranger calls from underground. You're their only way out.",
+    image: "/images/stories/the-call/cover.png",
+    imageOrientation: "portrait",
+    duration: "10 min",
+    genre: "thriller",
+    featured: true,
+    comingSoon: false,
+  },
+  {
     id: "the-last-session",
     title: "The Last Session",
     hook: "Your last patient has arrived. She knows too much.",
@@ -19,7 +30,7 @@ export const STORIES: StoryMeta[] = [
     imageOrientation: "landscape",
     duration: "12 min",
     genre: "psychological horror",
-    featured: true,
+    featured: false,
     comingSoon: false,
   },
   {
