@@ -324,7 +324,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
         dispatch({ type: "SET_STATUS", status: "error" });
         return;
       }
-      console.log(`[GAME] Starting session: agentId=${agentId}, storyId=${resolvedStoryId}`);
+
+      // Generate our OWN session ID. ElevenLabs does NOT forward its
+      // conversation_id in the webhook payload (it only sends OpenAI-compatible
+      // fields). Without this, the webhook auto-generates a different ID →
+      // "split brain" where webhook saves state under one key and the frontend
+      // polls under another, so game state never reaches the UI.
+      const sessionId = crypto.randomUUID();
+      console.log(`[GAME] Starting session: agentId=${agentId}, storyId=${resolvedStoryId}, sessionId=${sessionId}`);
 
       // Check mic permission state WITHOUT acquiring a stream.
       // LiveKit (ElevenLabs WebRTC) handles mic acquisition internally via
@@ -347,10 +354,20 @@ export function GameProvider({ children }: { children: ReactNode }) {
       // Overrides enabled on dashboard Security tab.
       // Leading "... " gives WebRTC audio time to initialize before first real word.
       // System prompt NOT overridden — webhook handles it server-side.
-      // story_id passed via elevenlabs_extra_body so the webhook knows which story config to load.
+      // story_id + session_id passed via customLlmExtraBody → becomes
+      // elevenlabs_extra_body in webhook, ensuring both sides use the same session key.
       console.log(`[GAME] firstMessage: "${resolvedFirstMessage.slice(0, 60)}…"`);
 
-      const cid = await conversationRef.current!.startSession({
+      // Init game state server-side BEFORE starting ElevenLabs session.
+      // This ensures the session exists when the webhook receives its first request.
+      await fetch("/api/game-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: sessionId, storyId: resolvedStoryId }),
+      });
+      console.log("[GAME] Game state initialized server-side");
+
+      const elevenLabsCid = await conversationRef.current!.startSession({
         agentId,
         connectionType: "webrtc",
         overrides: {
@@ -360,19 +377,14 @@ export function GameProvider({ children }: { children: ReactNode }) {
         },
         customLlmExtraBody: {
           story_id: resolvedStoryId,
+          session_id: sessionId,
         },
       });
-      console.log(`[GAME] Session started, conversationId=${cid}`);
-      conversationIdRef.current = cid;
-      dispatch({ type: "SET_CONVERSATION_ID", id: cid });
+      console.log(`[GAME] ElevenLabs session started, elevenLabsCid=${elevenLabsCid}, our sessionId=${sessionId}`);
 
-      // Init game state server-side keyed to this conversationId
-      await fetch("/api/game-state", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: cid, storyId: resolvedStoryId }),
-      });
-      console.log("[GAME] Game state initialized");
+      // Use OUR session ID for all game state operations (not ElevenLabs' ID)
+      conversationIdRef.current = sessionId;
+      dispatch({ type: "SET_CONVERSATION_ID", id: sessionId });
     } catch (err) {
       console.error("[GAME] Failed to start session:", err);
       dispatch({ type: "SET_STATUS", status: "error" });

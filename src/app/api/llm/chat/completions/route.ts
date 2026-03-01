@@ -112,29 +112,32 @@ export async function POST(req: NextRequest) {
 
     const { messages } = body;
 
-    // Extract conversation_id from available sources (priority order)
-    let conversation_id = body.conversation_id
+    // ── Resolve session ID — the key that MUST match frontend + webhook ──
+    // Priority:
+    // 1. session_id from elevenlabs_extra_body (set by client, passed through ElevenLabs)
+    // 2. conversation_id from body (ElevenLabs might add this in future)
+    // 3. conversation_id from extraBody
+    // 4. Auto-generated fallback (last resort — causes split brain if frontend uses different ID)
+    const explicitSessionId = extraBody.session_id as string | undefined;
+    let conversation_id = explicitSessionId
+      ?? body.conversation_id
       ?? (extraBody.conversation_id as string | undefined)
       ?? undefined;
 
-    // Determine story ID early — needed for conversation_id generation.
-    // This is the explicit value from ElevenLabs extra body only (no fallback yet).
+    // Determine story ID early — needed for fallback conversation_id generation.
     const explicitStoryId = extraBody.story_id as StoryId | undefined;
-    // Use explicit or DEFAULT for the conversation_id hash (needs a value before session lookup)
     const hashStoryId = explicitStoryId ?? DEFAULT_STORY_ID;
 
-    // If no conversation_id available, generate one from the FIRST user message + storyId.
-    // ElevenLabs accumulates the full conversation history on each request,
-    // so the first user message stays constant across all turns of the same session.
-    // Including storyId prevents session collision when a player says "Hello" in
-    // two different stories back-to-back (same message hash → different session).
+    // Fallback: auto-generate from first user message + storyId (should rarely happen
+    // now that client sends session_id, but kept for resilience)
     if (!conversation_id) {
       const userMsgs = messages.filter(m => m.role === "user");
       const firstUserMsg = userMsgs[0]?.content ?? "";
-      // Include storyId in hash to prevent cross-story collision
       const hash = Buffer.from(`${hashStoryId}:${firstUserMsg}`).toString("base64").slice(0, 24);
       conversation_id = `auto-${hash}`;
-      console.log(`[WEBHOOK] No conversation_id found — generated: ${conversation_id} (storyId=${hashStoryId}, msgLen=${firstUserMsg.length})`);
+      console.warn(`[WEBHOOK] ⚠ No session_id or conversation_id — auto-generated: ${conversation_id}`);
+    } else {
+      console.log(`[WEBHOOK] Session ID resolved: ${conversation_id} (source: ${explicitSessionId ? "session_id" : "conversation_id"})`);
     }
 
     // Story ID resolution priority:
