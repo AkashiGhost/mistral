@@ -82,7 +82,7 @@ const STORY_ONBOARDING: Record<string, StoryOnboarding> = {
   },
 };
 
-type OnboardingStep = "scene" | "headphones" | "countdown";
+type OnboardingStep = "scene" | "headphones" | "countdown" | "ringing";
 
 interface OnboardingFlowProps {
   storyId: string;
@@ -131,12 +131,67 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
   useEffect(() => {
     if (step !== "countdown") return;
     if (countdown <= 0) {
-      onComplete();
+      // "the-call" story: phone rings before session starts
+      if (storyId === "the-call") {
+        setStep("ringing");
+      } else {
+        onComplete();
+      }
       return;
     }
     const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
     return () => clearTimeout(timer);
-  }, [step, countdown, onComplete]);
+  }, [step, countdown, onComplete, storyId]);
+
+  // ── Phone ringing phase (the-call only) ────────────────────
+  // Plays a North American ring tone (440Hz + 480Hz) for one cycle,
+  // then silence, then starts the session. Creates the moment of
+  // "phone ringing → someone picks up → Alex speaks".
+  useEffect(() => {
+    if (step !== "ringing") return;
+
+    let ctx: AudioContext | null = null;
+    try {
+      ctx = new AudioContext();
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      // North American ring tone: 440Hz + 480Hz
+      osc1.frequency.value = 440;
+      osc2.frequency.value = 480;
+      osc1.type = "sine";
+      osc2.type = "sine";
+      gain.gain.value = 0.12;
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+      gain.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      // Ring for 2 seconds with fade-out at the end
+      osc1.start(now);
+      osc2.start(now);
+      gain.gain.setValueAtTime(0.12, now + 1.7);
+      gain.gain.linearRampToValueAtTime(0, now + 2);
+      osc1.stop(now + 2);
+      osc2.stop(now + 2);
+    } catch {
+      // AudioContext failed — proceed without ring
+      console.warn("[ONBOARDING] Could not play phone ring");
+    }
+
+    // 2s ring + 2s silence = 4s before session connects
+    const timer = setTimeout(() => {
+      ctx?.close().catch(() => {});
+      onComplete();
+    }, 4000);
+
+    return () => {
+      clearTimeout(timer);
+      ctx?.close().catch(() => {});
+    };
+  }, [step, onComplete]);
 
   const advance = useCallback(() => {
     if (step === "scene") {
@@ -346,6 +401,20 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           BEGIN
         </button>
       </div>
+    );
+  }
+
+  // ── Ringing step (the-call only) — pure black, phone ring plays ──
+  if (step === "ringing") {
+    return (
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+          backgroundColor: "var(--black)",
+          zIndex: 100,
+        }}
+      />
     );
   }
 

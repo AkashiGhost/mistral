@@ -70,20 +70,18 @@ const TIMELINES: Record<string, SoundTimelineEvent[]> = {
   ],
 
   "the-call": [
-    // ── Ringing phase (t=0 to ~t=4) ──────────────────────────
-    // Phone ring plays once — 6s buffer: 2s ring ON then 4s silence
-    { time: 0, action: "play_once", soundIds: ["phone_ring"] },
-    // Phone static starts looping immediately but at near-inaudible volume
-    // (gives the impression the line is already connected, waiting behind the ring)
+    // ── Phone ring now plays during OnboardingFlow "ringing" step ──
+    // (before ElevenLabs session starts, so ring → pickup → Alex speaks)
+
+    // Phone static starts immediately at near-inaudible volume
     { time: 0, action: "start_ambient", soundIds: ["phone_static"] },
     { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.03, fadeDurationSeconds: 0 },
 
     // ── Pickup ────────────────────────────────────────────────
-    // pickup_click is now event-driven (fires when AI first speaks, see useSoundEngine)
-    // Electrical hum starts — signals call has connected
-    { time: 4.2, action: "start_ambient", soundIds: ["electrical_hum"] },
-    // Static swells up to normal call volume over 2s (call connecting feel)
-    { time: 4.2, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.15, fadeDurationSeconds: 2 },
+    // pickup_click is event-driven (fires when AI first speaks, see useSoundEngine)
+    // Electrical hum + static swell start immediately (call already connected)
+    { time: 0, action: "start_ambient", soundIds: ["electrical_hum"] },
+    { time: 0, action: "volume_adjust", soundId: "phone_static", targetVolume: 0.15, fadeDurationSeconds: 2 },
 
     // ── Mid-game tension ──────────────────────────────────────
     // Sub bass creeps in after a couple minutes
