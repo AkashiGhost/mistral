@@ -46,6 +46,11 @@ const WebhookRequestSchema = z.object({
   max_tokens: z.number().optional(),
   stream: z.boolean().optional(),
   conversation_id: z.string().optional(),
+  // ElevenLabs renames "custom_llm_extra_body" from the client SDK to
+  // "elevenlabs_extra_body" in the webhook payload. Accept both field names
+  // for resilience — the client SDK sends as custom_llm_extra_body at session
+  // init, but the ElevenLabs server forwards it as elevenlabs_extra_body.
+  elevenlabs_extra_body: z.record(z.string(), z.unknown()).optional(),
   custom_llm_extra_body: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -84,6 +89,10 @@ export async function POST(req: NextRequest) {
     }
     const body = parseResult.data;
 
+    // ── Log raw body keys BEFORE any extraction (diagnostic) ────
+    const rawKeys = typeof rawBody === "object" && rawBody !== null ? Object.keys(rawBody) : [];
+    console.log(`[WEBHOOK] Raw body top-level keys: [${rawKeys.join(", ")}]`);
+
     // ── Log full request shape ───────────────────────────────────
     const messageSummary = body.messages.map((m) => ({
       role: m.role,
@@ -94,18 +103,25 @@ export async function POST(req: NextRequest) {
     console.log(`[WEBHOOK] Messages breakdown:`, JSON.stringify(messageSummary));
     console.log(`[WEBHOOK] ElevenLabs system prompt preview (first 200): "${elevenLabsSystemPrompt.slice(0, 200)}"`);
     console.log(`[WEBHOOK] conversation_id from body: ${body.conversation_id ?? "(none)"}`);
-    console.log(`[WEBHOOK] custom_llm_extra_body present: ${!!body.custom_llm_extra_body}`);
+
+    // ── Resolve extra body — ElevenLabs uses "elevenlabs_extra_body" in webhook ──
+    // The client SDK sends "customLlmExtraBody" at session init, but the
+    // ElevenLabs server renames it to "elevenlabs_extra_body" when forwarding
+    // to the webhook. Accept both for resilience.
+    const extraBody = body.elevenlabs_extra_body ?? body.custom_llm_extra_body ?? {};
+    console.log(`[WEBHOOK] elevenlabs_extra_body present: ${!!body.elevenlabs_extra_body}, custom_llm_extra_body present: ${!!body.custom_llm_extra_body}`);
+    console.log(`[WEBHOOK] Resolved extraBody: ${JSON.stringify(extraBody)}`);
 
     const { messages } = body;
 
     // Extract conversation_id from available sources (priority order)
     let conversation_id = body.conversation_id
-      ?? (body.custom_llm_extra_body?.conversation_id as string | undefined)
+      ?? (extraBody.conversation_id as string | undefined)
       ?? undefined;
 
     // Determine story ID early — needed for conversation_id generation.
-    // This is the explicit value from ElevenLabs custom_llm_extra_body only (no fallback yet).
-    const explicitStoryId = body.custom_llm_extra_body?.story_id as StoryId | undefined;
+    // This is the explicit value from ElevenLabs extra body only (no fallback yet).
+    const explicitStoryId = extraBody.story_id as StoryId | undefined;
     // Use explicit or DEFAULT for the conversation_id hash (needs a value before session lookup)
     const hashStoryId = explicitStoryId ?? DEFAULT_STORY_ID;
 
@@ -124,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Story ID resolution priority:
-    // 1. Explicit from request (custom_llm_extra_body.story_id)
+    // 1. Explicit from request (elevenlabs_extra_body.story_id)
     // 2. From existing session (if player already started this conversation)
     // 3. DEFAULT_STORY_ID as absolute last resort
     const existingSession = conversation_id ? getSession(conversation_id) : undefined;
@@ -132,11 +148,11 @@ export async function POST(req: NextRequest) {
       ?? existingSession?.storyId
       ?? DEFAULT_STORY_ID;
 
-    if (!body.custom_llm_extra_body?.story_id) {
-      console.warn(`[WEBHOOK] ⚠ story_id MISSING from custom_llm_extra_body! Falling back to: "${requestStoryId}" (source: ${existingSession?.storyId ? "existing session" : "DEFAULT"})`);
-      console.warn(`[WEBHOOK] ⚠ Check ElevenLabs dashboard → Security → Overrides → "Custom LLM extra body" must be ENABLED`);
+    if (!explicitStoryId) {
+      console.warn(`[WEBHOOK] ⚠ story_id MISSING from extra body! Falling back to: "${requestStoryId}" (source: ${existingSession?.storyId ? "existing session" : "DEFAULT"})`);
+      console.warn(`[WEBHOOK] ⚠ Raw body keys: [${rawKeys.join(", ")}] — expected "elevenlabs_extra_body" or "custom_llm_extra_body"`);
     }
-    console.log(`[WEBHOOK] requestStoryId="${requestStoryId}" (from custom_llm_extra_body: ${JSON.stringify(body.custom_llm_extra_body ?? {})})`);
+    console.log(`[WEBHOOK] requestStoryId="${requestStoryId}" (from extraBody: ${JSON.stringify(extraBody)})`);
 
     // Get or init session state
     let session = getSession(conversation_id);
