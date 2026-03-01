@@ -87,8 +87,10 @@ function buildWorldAndCharacterLayer(config: GameConfig): string {
     if (physics.rules?.length) parts.push(`RULES:\n${physics.rules.map((r: string) => `- ${r}`).join("\n")}`);
   }
 
-  // Character card (first character = primary AI character)
-  const char = config.characters[0];
+  // Character card — use the narrator character (the AI's voice), not just the first character.
+  // Character files are loaded alphabetically from the filesystem, so [0] may be
+  // a player_character (e.g., The Lighthouse has keeper.yaml before radio-voice.yaml).
+  const char = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
   if (char) {
     parts.push(`CHARACTER: ${char.name} (${char.role})`);
     parts.push(`VOICE: ${char.voice.description}`);
@@ -145,7 +147,8 @@ function buildRecentExchangeLayer(state: StoryState, config: GameConfig): string
   const recent = state.conversationHistory.slice(-MAX_RECENT_TURNS);
   if (recent.length === 0) return "RECENT EXCHANGES: (session just started)";
 
-  const aiName = config.characters[0]?.name ?? "AI";
+  const narratorChar = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
+  const aiName = narratorChar?.name ?? "AI";
   const lines = recent.map((turn) => {
     const speaker = turn.role === "player" ? "PLAYER" : aiName.toUpperCase();
     // Truncate long turns
@@ -172,7 +175,8 @@ function buildCompressedHistoryLayer(state: StoryState, config: GameConfig): str
 
   if (older.length === 0) return "";
 
-  const aiName = config.characters[0]?.name ?? "AI";
+  const narratorChar = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
+  const aiName = narratorChar?.name ?? "AI";
   const aiInitial = aiName[0] ?? "A";
 
   // Compress to one-line summaries

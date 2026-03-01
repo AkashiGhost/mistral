@@ -20,7 +20,7 @@ import { STYLE_TIE_BREAK_ORDER } from "./types/story-state";
 
 /** Create initial game state from config */
 export function initState(config: GameConfig): StoryState {
-  const elara = config.characters[0];
+  const elara = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
   const state: StoryState = {
     status: "playing",
     currentPhaseIndex: 0,

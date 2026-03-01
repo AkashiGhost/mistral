@@ -103,8 +103,11 @@ export async function POST(req: NextRequest) {
       ?? (body.custom_llm_extra_body?.conversation_id as string | undefined)
       ?? undefined;
 
-    // Determine story ID early — needed for conversation_id generation
-    const requestStoryId = (body.custom_llm_extra_body?.story_id as StoryId | undefined) ?? DEFAULT_STORY_ID;
+    // Determine story ID early — needed for conversation_id generation.
+    // This is the explicit value from ElevenLabs custom_llm_extra_body only (no fallback yet).
+    const explicitStoryId = body.custom_llm_extra_body?.story_id as StoryId | undefined;
+    // Use explicit or DEFAULT for the conversation_id hash (needs a value before session lookup)
+    const hashStoryId = explicitStoryId ?? DEFAULT_STORY_ID;
 
     // If no conversation_id available, generate one from the FIRST user message + storyId.
     // ElevenLabs accumulates the full conversation history on each request,
@@ -115,9 +118,23 @@ export async function POST(req: NextRequest) {
       const userMsgs = messages.filter(m => m.role === "user");
       const firstUserMsg = userMsgs[0]?.content ?? "";
       // Include storyId in hash to prevent cross-story collision
-      const hash = Buffer.from(`${requestStoryId}:${firstUserMsg}`).toString("base64").slice(0, 24);
+      const hash = Buffer.from(`${hashStoryId}:${firstUserMsg}`).toString("base64").slice(0, 24);
       conversation_id = `auto-${hash}`;
-      console.log(`[WEBHOOK] No conversation_id found — generated: ${conversation_id} (storyId=${requestStoryId}, msgLen=${firstUserMsg.length})`);
+      console.log(`[WEBHOOK] No conversation_id found — generated: ${conversation_id} (storyId=${hashStoryId}, msgLen=${firstUserMsg.length})`);
+    }
+
+    // Story ID resolution priority:
+    // 1. Explicit from request (custom_llm_extra_body.story_id)
+    // 2. From existing session (if player already started this conversation)
+    // 3. DEFAULT_STORY_ID as absolute last resort
+    const existingSession = conversation_id ? getSession(conversation_id) : undefined;
+    const requestStoryId = explicitStoryId
+      ?? existingSession?.storyId
+      ?? DEFAULT_STORY_ID;
+
+    if (!body.custom_llm_extra_body?.story_id) {
+      console.warn(`[WEBHOOK] ⚠ story_id MISSING from custom_llm_extra_body! Falling back to: "${requestStoryId}" (source: ${existingSession?.storyId ? "existing session" : "DEFAULT"})`);
+      console.warn(`[WEBHOOK] ⚠ Check ElevenLabs dashboard → Security → Overrides → "Custom LLM extra body" must be ENABLED`);
     }
     console.log(`[WEBHOOK] requestStoryId="${requestStoryId}" (from custom_llm_extra_body: ${JSON.stringify(body.custom_llm_extra_body ?? {})})`);
 
@@ -215,7 +232,8 @@ export async function POST(req: NextRequest) {
       const choiceLines = session.pendingChoice.options
         .map((opt, i) => `- Option ${i + 1}: ${opt.label}`)
         .join("\n");
-      const charName = config.characters[0]?.name ?? "the character";
+      const narratorChar = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
+      const charName = narratorChar?.name ?? "the character";
       systemPrompt += [
         "\n\n[CHOICE MOMENT] Present these options to the player naturally in your next response.",
         `Do not list them mechanically — weave them into your dialogue as ${charName} would.`,
