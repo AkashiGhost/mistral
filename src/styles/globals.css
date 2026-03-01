@@ -148,6 +148,27 @@ button {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Skip-to-content — CSS-only focus reveal (server component safe) */
+.skip-to-content {
+  position: absolute;
+  left: -9999px;
+  top: auto;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.skip-to-content:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  padding: var(--space-xs) var(--space-sm);
+  background: var(--black);
+  color: var(--white);
+  z-index: 9999;
+}
+
 /* Reduced motion */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

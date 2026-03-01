@@ -54,22 +54,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${bebasNeue.variable} ${cormorantGaramond.variable}`}>
       <body>
-        <a
-          href="#main-content"
-          style={{
-            position: "absolute",
-            left: "-9999px",
-            top: "auto",
-            width: "1px",
-            height: "1px",
-            overflow: "hidden",
-          }}
-          onFocus={(e) => {
-            e.currentTarget.style.position = "static";
-            e.currentTarget.style.width = "auto";
-            e.currentTarget.style.height = "auto";
-          }}
-        >
+        <a href="#main-content" className="skip-to-content">
           Skip to content
         </a>
         <TransitionProvider>
