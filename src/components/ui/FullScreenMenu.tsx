@@ -10,8 +10,9 @@ interface FullScreenMenuProps {
 }
 
 const MENU_ITEMS = [
+  { label: "PLAY", href: "/play?story=the-call", accent: true },
   { label: "STORIES", href: "/#stories", accent: false },
-  { label: "BEGIN", href: "/#stories", accent: true },
+  { label: "ABOUT", href: "/#about", accent: false },
 ];
 
 export function FullScreenMenu({ open, onClose }: FullScreenMenuProps) {

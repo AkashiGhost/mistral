@@ -20,7 +20,7 @@ const CARD_HOVER_CSS = [
   "@media (max-width: 767px) { .story-card { max-height: 65vh; } }",
   "@keyframes scroll-hint { 0%, 100% { opacity: 0.3; transform: translateY(0); } 50% { opacity: 0.6; transform: translateY(6px); } }",
   ".scroll-hint { animation: scroll-hint 2.5s ease-in-out infinite; }",
-  ".waitlist-input::placeholder { color: var(--muted); }",
+  ".waitlist-input::placeholder { color: var(--muted); opacity: 0.5; }",
   ".waitlist-input:focus { outline: none; border-color: var(--accent) !important; }",
 ].join("\n");
 
@@ -31,17 +31,27 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
   const [submitted, setSubmitted] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) return;
 
-    // Persist to localStorage
+    // Always store locally as backup
     const existing: string[] = JSON.parse(
       localStorage.getItem("innerplay-waitlist") ?? "[]"
     );
     if (!existing.includes(email.trim())) {
       existing.push(email.trim());
       localStorage.setItem("innerplay-waitlist", JSON.stringify(existing));
+    }
+
+    // Send to Formspree if configured (fire-and-forget)
+    const formspreeId = process.env.NEXT_PUBLIC_FORMSPREE_ID;
+    if (formspreeId) {
+      fetch(`https://formspree.io/f/${formspreeId}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), _subject: "InnerPlay Waitlist Signup" }),
+      }).catch(() => {}); // silent fail — localStorage has it
     }
 
     setSubmitted(true);
@@ -83,10 +93,10 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
         style={{
           position: "relative",
           width: "100%",
-          maxWidth: 400,
+          maxWidth: 480,
           background: "var(--black)",
           border: "1px solid var(--muted)",
-          padding: "var(--space-lg)",
+          padding: "56px 40px",
           borderRadius: 0,
         }}
       >
@@ -102,7 +112,7 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
             border: "none",
             color: "var(--muted)",
             fontFamily: "var(--font-display)",
-            fontSize: "var(--type-ui)",
+            fontSize: "var(--type-body)",
             letterSpacing: "1px",
             cursor: "pointer",
             minHeight: 48,
@@ -125,7 +135,7 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
             <p
               style={{
                 fontFamily: "var(--font-literary)",
-                fontSize: "var(--type-title)",
+                fontSize: "var(--type-lead)",
                 color: "var(--white)",
                 fontStyle: "italic",
                 margin: 0,
@@ -139,11 +149,11 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
             <h2
               style={{
                 fontFamily: "var(--font-display)",
-                fontSize: "var(--type-title)",
+                fontSize: "var(--type-lead)",
                 color: "var(--white)",
                 letterSpacing: "2px",
                 margin: 0,
-                marginBottom: "var(--space-sm)",
+                marginBottom: "var(--space-md)",
                 lineHeight: 1,
               }}
             >
@@ -152,7 +162,7 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
             <p
               style={{
                 fontFamily: "var(--font-literary)",
-                fontSize: "var(--type-body)",
+                fontSize: "var(--type-title)",
                 color: "var(--muted)",
                 fontStyle: "italic",
                 margin: 0,
@@ -175,13 +185,13 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
                 required
                 style={{
                   width: "100%",
-                  height: 48,
+                  height: 56,
                   background: "var(--black)",
                   border: "1px solid var(--muted)",
                   color: "var(--white)",
                   fontFamily: "var(--font-ui)",
-                  fontSize: "var(--type-ui)",
-                  padding: "0 var(--space-sm)",
+                  fontSize: "var(--type-body)",
+                  padding: "0 var(--space-md)",
                   borderRadius: 0,
                   boxSizing: "border-box",
                   marginBottom: "var(--space-sm)",
@@ -191,13 +201,13 @@ function WaitlistModal({ open, onClose }: { open: boolean; onClose: () => void }
                 type="submit"
                 style={{
                   width: "100%",
-                  height: 48,
+                  height: 56,
                   background: "transparent",
                   border: "1px solid var(--accent)",
                   color: "var(--accent)",
                   fontFamily: "var(--font-display)",
-                  fontSize: "var(--type-ui)",
-                  letterSpacing: "2px",
+                  fontSize: "var(--type-body)",
+                  letterSpacing: "3px",
                   cursor: "pointer",
                   borderRadius: 0,
                 }}
@@ -401,6 +411,65 @@ export default function Home() {
           >
             STORIES
           </h2>
+
+          {/* Featured: Play The Call */}
+          <div
+            style={{
+              marginBottom: "var(--space-lg)",
+              padding: "var(--space-md)",
+              border: "1px solid var(--accent)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "var(--space-sm)",
+            }}
+          >
+            <div>
+              <h3
+                style={{
+                  fontFamily: "var(--font-literary)",
+                  fontSize: "var(--type-title)",
+                  color: "var(--white)",
+                  fontWeight: 400,
+                  margin: 0,
+                  lineHeight: 1.3,
+                }}
+              >
+                The Call
+              </h3>
+              <p
+                style={{
+                  fontFamily: "var(--font-literary)",
+                  fontSize: "var(--type-body)",
+                  color: "var(--muted)",
+                  fontStyle: "italic",
+                  margin: 0,
+                  marginTop: 4,
+                }}
+              >
+                A stranger calls from underground. Guide them out. Your voice is all they have.
+              </p>
+            </div>
+            <TransitionLink
+              href="/play?story=the-call"
+              style={{
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--type-title)",
+                color: "var(--accent)",
+                letterSpacing: "3px",
+                textDecoration: "none",
+                minHeight: 48,
+                padding: "0 var(--space-md)",
+                display: "inline-flex",
+                alignItems: "center",
+                border: "1px solid var(--accent)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              PLAY NOW
+            </TransitionLink>
+          </div>
 
           <div
             className="stories-grid"
@@ -699,6 +768,113 @@ export default function Home() {
           >
             JOIN WAITLIST
           </button>
+        </section>
+
+        {/* Section 4: About */}
+        <section
+          id="about"
+          style={{
+            padding: "var(--space-xl) var(--space-lg)",
+            background: "var(--black)",
+            borderTop: "1px solid rgba(255,255,255,0.06)",
+            maxWidth: 680,
+            margin: "0 auto",
+          }}
+        >
+          <h2
+            style={{
+              fontFamily: "var(--font-display)",
+              fontSize: "var(--type-section)",
+              color: "var(--white)",
+              letterSpacing: "2px",
+              lineHeight: 1,
+              marginTop: 0,
+              marginBottom: "var(--space-md)",
+            }}
+          >
+            ABOUT
+          </h2>
+          <p
+            style={{
+              fontFamily: "var(--font-literary)",
+              fontSize: "var(--type-body)",
+              color: "var(--muted)",
+              fontStyle: "italic",
+              lineHeight: 1.8,
+              margin: 0,
+              marginBottom: "var(--space-md)",
+            }}
+          >
+            InnerPlay is a new kind of interactive entertainment — voice-powered
+            storytelling you experience with your eyes closed. No screen. No UI.
+            Just your voice, your imagination, and an AI character who responds to
+            everything you say.
+          </p>
+          <p
+            style={{
+              fontFamily: "var(--font-literary)",
+              fontSize: "var(--type-body)",
+              color: "var(--muted)",
+              fontStyle: "italic",
+              lineHeight: 1.8,
+              margin: 0,
+              marginBottom: "var(--space-md)",
+            }}
+          >
+            Stories adapt to how you play — not just what you choose, but how you
+            speak, how long you pause, and what kind of person you are. Every
+            session is different. Every player gets a different story.
+          </p>
+          <p
+            style={{
+              fontFamily: "var(--font-literary)",
+              fontSize: "var(--type-body)",
+              color: "var(--muted)",
+              fontStyle: "italic",
+              lineHeight: 1.8,
+              margin: 0,
+              marginBottom: "var(--space-lg)",
+            }}
+          >
+            Powered by Mistral AI for dynamic narration and ElevenLabs for
+            real-time voice synthesis. Built for the Mistral Worldwide Hackathon 2026.
+          </p>
+          <div style={{ display: "flex", gap: "var(--space-md)", flexWrap: "wrap" }}>
+            <a
+              href="https://www.linkedin.com/in/akash-manmohan-776bba1a1/"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--type-ui)",
+                color: "var(--accent)",
+                letterSpacing: "1px",
+                textDecoration: "none",
+                minHeight: 48,
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              AKASH MANMOHAN — LINKEDIN ↗
+            </a>
+            <a
+              href="https://github.com/AkashiGhost/mistral"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontFamily: "var(--font-ui)",
+                fontSize: "var(--type-ui)",
+                color: "var(--muted)",
+                letterSpacing: "1px",
+                textDecoration: "none",
+                minHeight: 48,
+                display: "inline-flex",
+                alignItems: "center",
+              }}
+            >
+              GITHUB ↗
+            </a>
+          </div>
         </section>
 
         {/* Footer */}
