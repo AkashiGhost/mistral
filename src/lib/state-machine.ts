@@ -102,10 +102,11 @@ export function advancePhase(
   }
 
   const nextPhase = config.arc.phases[nextPhaseIndex];
-  const nextArcStageIndex = Math.min(
-    nextPhaseIndex,
-    config.characters[0].arc.stages.length - 1,
-  );
+  // Use narrator character for arc stages (not characters[0] which may be a
+  // player avatar without an arc — e.g., the-lighthouse's keeper.yaml)
+  const narratorChar = config.characters.find(c => c.role === "narrator") ?? config.characters[0];
+  const arcStagesCount = narratorChar?.arc?.stages?.length ?? config.arc.phases.length;
+  const nextArcStageIndex = Math.min(nextPhaseIndex, arcStagesCount - 1);
 
   // Calculate revelation variant at Phase 4 entry (index 3)
   let revelationVariant = state.revelationVariant;
