@@ -148,14 +148,14 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           justifyContent: "center",
         }}
       >
-        {/* Scene image — portrait 2:3 */}
+        {/* Scene image — landscape 16:9 */}
         <div
           style={{
             position: "relative",
             width: "100%",
-            maxWidth: 400,
-            aspectRatio: "2 / 3",
-            maxHeight: "calc(100dvh - 220px)",
+            maxWidth: "min(90vw, 600px)",
+            aspectRatio: "16 / 9",
+            maxHeight: "calc(100dvh - 250px)",
             overflow: "hidden",
             borderRadius: 0,
           }}
@@ -164,7 +164,7 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
             src={currentScene.image}
             alt=""
             fill
-            sizes="(max-width: 400px) 100vw, 400px"
+            sizes="(max-width: 600px) 90vw, 600px"
             style={{ objectFit: "cover" }}
             priority
           />

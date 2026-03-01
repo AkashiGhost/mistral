@@ -31,7 +31,7 @@ export function NavigationChrome({
 
   const beginHref =
     variant === "landing"
-      ? "/stories"
+      ? "#stories"
       : "/play?story=the-last-session";
 
   const delay = variant === "landing" ? 1.8 : 0;
@@ -136,6 +136,14 @@ export function NavigationChrome({
       <a
         href={beginHref}
         className="chrome-bottom"
+        onClick={(e) => {
+          if (beginHref.startsWith("#")) {
+            e.preventDefault();
+            document
+              .getElementById(beginHref.slice(1))
+              ?.scrollIntoView({ behavior: "smooth" });
+          }
+        }}
         style={{
           position: "absolute",
           bottom: "var(--space-sm)",

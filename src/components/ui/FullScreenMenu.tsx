@@ -1,5 +1,7 @@
 "use client";
 
+import { useCallback } from "react";
+import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 
 interface FullScreenMenuProps {
@@ -8,12 +10,34 @@ interface FullScreenMenuProps {
 }
 
 const MENU_ITEMS = [
-  { label: "STORIES", href: "/stories", accent: false },
+  { label: "STORIES", href: "/#stories", accent: false },
   { label: "ABOUT", href: "/about", accent: false },
-  { label: "BEGIN", href: "/play?story=the-last-session", accent: true },
+  { label: "BEGIN", href: "/#stories", accent: true },
 ];
 
 export function FullScreenMenu({ open, onClose }: FullScreenMenuProps) {
+  const pathname = usePathname();
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      // If on the landing page and link targets an anchor on this page
+      if (pathname === "/" && href.startsWith("/#")) {
+        e.preventDefault();
+        onClose();
+        // Small delay so menu closes before scroll
+        setTimeout(() => {
+          const id = href.slice(2); // strip "/#"
+          document
+            .getElementById(id)
+            ?.scrollIntoView({ behavior: "smooth" });
+        }, 350);
+      } else {
+        onClose();
+      }
+    },
+    [pathname, onClose],
+  );
+
   return (
     <AnimatePresence>
       {open && (
@@ -36,9 +60,13 @@ export function FullScreenMenu({ open, onClose }: FullScreenMenuProps) {
           }}
         >
           {/* Short screen: tighter menu gap */}
-          <style>{`@media(max-height:700px){.menu-items{gap:var(--space-lg)!important}}`}</style>
+          <style>
+            {
+              "@media(max-height:700px){.menu-items{gap:var(--space-lg)!important}}"
+            }
+          </style>
 
-          {/* Close button — top-right */}
+          {/* Close button -- top-right */}
           <button
             type="button"
             onClick={onClose}
@@ -68,7 +96,7 @@ export function FullScreenMenu({ open, onClose }: FullScreenMenuProps) {
             <motion.a
               key={item.label}
               href={item.href}
-              onClick={onClose}
+              onClick={(e) => handleClick(e, item.href)}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1 + i * 0.08, duration: 0.4 }}

@@ -3,6 +3,7 @@ export interface StoryMeta {
   title: string;
   hook: string;
   image: string;
+  imageOrientation: "landscape" | "portrait";
   duration: string;
   genre: string;
   featured: boolean;
@@ -15,6 +16,7 @@ export const STORIES: StoryMeta[] = [
     title: "The Last Session",
     hook: "Your last patient has arrived. She knows too much.",
     image: "/images/stories/the-last-session/card.webp",
+    imageOrientation: "landscape",
     duration: "12 min",
     genre: "psychological horror",
     featured: true,
@@ -25,6 +27,7 @@ export const STORIES: StoryMeta[] = [
     title: "The Lighthouse",
     hook: "A storm. A radio. A voice that knows your name.",
     image: "/images/stories/the-lighthouse/card.webp",
+    imageOrientation: "landscape",
     duration: "10 min",
     genre: "cosmic horror",
     featured: false,
@@ -35,6 +38,7 @@ export const STORIES: StoryMeta[] = [
     title: "Room 4B",
     hook: "The door won't stay locked. The chart has your name.",
     image: "/images/stories/room-4b/card.webp",
+    imageOrientation: "portrait",
     duration: "10 min",
     genre: "body horror",
     featured: false,
