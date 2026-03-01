@@ -230,18 +230,21 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
               onClick={advance}
               style={{
                 background: "none",
-                border: "none",
-                color: "var(--muted)",
-                fontSize: "var(--type-ui)",
+                border: "1px solid var(--muted)",
+                color: "var(--white)",
+                fontSize: "var(--type-body)",
                 fontFamily: "var(--font-ui)",
                 cursor: "pointer",
-                letterSpacing: "0.06em",
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
                 opacity: continueOpacity,
                 transition: "opacity 1s ease",
-                padding: "var(--space-xs) var(--space-sm)",
+                padding: "var(--space-sm) var(--space-lg)",
+                minHeight: "var(--touch-min)",
+                minWidth: 140,
               }}
             >
-              continue
+              Continue
             </button>
           )}
         </div>
@@ -326,20 +329,21 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
           onClick={advance}
           style={{
             minHeight: "var(--touch-min)",
-            padding: "var(--space-sm) var(--space-lg)",
-            border: "none",
+            padding: "var(--space-sm) var(--space-xl)",
+            border: "1px solid var(--accent)",
             borderRadius: 0,
             color: "var(--accent)",
-            fontSize: "var(--type-body)",
-            fontFamily: "var(--font-literary)",
-            letterSpacing: "0.05em",
+            fontSize: "var(--type-title)",
+            fontFamily: "var(--font-display)",
+            letterSpacing: "0.1em",
             textTransform: "uppercase",
             transition: "var(--transition-normal)",
             backgroundColor: "transparent",
             cursor: "pointer",
+            minWidth: 180,
           }}
         >
-          Begin
+          BEGIN
         </button>
       </div>
     );
@@ -364,9 +368,9 @@ export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
     >
       <p
         style={{
-          fontSize: "var(--type-body)",
+          fontSize: "var(--type-lead)",
           color: "var(--muted)",
-          marginBottom: "var(--space-md)",
+          marginBottom: "var(--space-lg)",
           fontFamily: "var(--font-literary)",
           fontStyle: "italic",
         }}

@@ -165,13 +165,18 @@ export function useSoundEngine({
   const CUE_COOLDOWN_MS = 30_000; // 30 seconds between same sound cue re-triggers
 
   // ── Initialize engine when game starts playing ────────────
+  // Delayed by 3s to let ElevenLabs WebRTC audio establish first.
+  // Creating AudioContext + 13 concurrent OfflineAudioContext renders
+  // can starve the audio thread and cause ElevenLabs first audio to fail.
   useEffect(() => {
     if (status !== "playing" || initStartedRef.current) return;
     initStartedRef.current = true;
 
+    const INIT_DELAY_MS = 3000; // Give ElevenLabs 3s head start
+
     const setup = async () => {
       try {
-        console.log(`[USE-SOUND] Initializing SoundEngine for story: ${storyId}`);
+        console.log(`[USE-SOUND] Initializing SoundEngine for story: ${storyId} (delayed ${INIT_DELAY_MS}ms)`);
 
         const spatialMap = SPATIAL_MAPS[storyId] ?? SPATIAL_MAPS["the-last-session"];
         const engine = new SoundEngine({
@@ -204,7 +209,8 @@ export function useSoundEngine({
       }
     };
 
-    void setup();
+    const delayTimer = setTimeout(() => void setup(), INIT_DELAY_MS);
+    return () => clearTimeout(delayTimer);
   }, [status, storyId]);
 
   // ── TTS Ducking ───────────────────────────────────────
