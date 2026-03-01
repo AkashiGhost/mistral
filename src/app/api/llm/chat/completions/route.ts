@@ -2,7 +2,7 @@
 // ElevenLabs ConvAI — custom LLM webhook
 // ElevenLabs sends the conversation history here; we inject our story
 // system prompt, call Mistral Large, and return an OpenAI-compatible response.
-// ElevenLabs then converts our text to Elara's voice.
+// ElevenLabs then converts our text to the character's voice.
 //
 // ElevenLabs auto-appends /chat/completions to the Server URL,
 // so this route lives at /api/llm/chat/completions.
@@ -79,26 +79,33 @@ export async function POST(req: NextRequest) {
       ?? (body.custom_llm_extra_body?.conversation_id as string | undefined)
       ?? undefined;
 
-    // If no conversation_id available, generate one from the FIRST user message.
+    // Determine story ID early — needed for conversation_id generation
+    const requestStoryId = (body.custom_llm_extra_body?.story_id as StoryId | undefined) ?? DEFAULT_STORY_ID;
+
+    // If no conversation_id available, generate one from the FIRST user message + storyId.
     // ElevenLabs accumulates the full conversation history on each request,
     // so the first user message stays constant across all turns of the same session.
-    // Using the last message would create a new session every turn, losing game state.
+    // Including storyId prevents session collision when a player says "Hello" in
+    // two different stories back-to-back (same message hash → different session).
     if (!conversation_id) {
       const userMsgs = messages.filter(m => m.role === "user");
       const firstUserMsg = userMsgs[0]?.content ?? "";
-      // Simple hash: use first 16 chars of base64-encoded content for uniqueness
-      const hash = Buffer.from(firstUserMsg).toString("base64").slice(0, 16);
+      // Include storyId in hash to prevent cross-story collision
+      const hash = Buffer.from(`${requestStoryId}:${firstUserMsg}`).toString("base64").slice(0, 24);
       conversation_id = `auto-${hash}`;
-      console.log(`[WEBHOOK] No conversation_id found — generated from first user message: ${conversation_id}`);
+      console.log(`[WEBHOOK] No conversation_id found — generated: ${conversation_id} (storyId=${requestStoryId}, msgLen=${firstUserMsg.length})`);
     }
-
-    // Determine story ID — from existing session or from request metadata
-    const requestStoryId = (body.custom_llm_extra_body?.story_id as StoryId | undefined) ?? DEFAULT_STORY_ID;
+    console.log(`[WEBHOOK] requestStoryId="${requestStoryId}" (from custom_llm_extra_body: ${JSON.stringify(body.custom_llm_extra_body ?? {})})`);
 
     // Get or init session state
     let session = getSession(conversation_id);
     const sessionWasNew = !session;
-    const storyId = session?.storyId ?? requestStoryId;
+    // ALWAYS prefer the explicitly-requested story_id over a cached session's storyId.
+    // Session collision can happen when auto-generated conversation_ids match
+    // (e.g. player says "Hello" in two different stories → same hash → same session).
+    // The requestStoryId from custom_llm_extra_body is the ground truth.
+    const storyId = requestStoryId;
+    console.log(`[WEBHOOK] Using storyId="${storyId}" (request="${requestStoryId}", session="${session?.storyId ?? "none"}", new=${sessionWasNew})`);
     let config: GameConfig;
     try {
       config = getConfig(storyId);
@@ -106,7 +113,12 @@ export async function POST(req: NextRequest) {
       console.error(`[WEBHOOK] Failed to load story "${storyId}":`, cfgErr);
       return openAiSSEResponse("I'm sorry, I cannot find that story right now. Please try again.");
     }
-    if (!session) {
+    // Create a new session if: no session exists, OR the session belongs to a different story
+    // (session collision from auto-generated conversation_id).
+    if (!session || session.storyId !== storyId) {
+      if (session && session.storyId !== storyId) {
+        console.warn(`[WEBHOOK] SESSION COLLISION: existing session storyId="${session.storyId}" but request wants "${storyId}" — creating fresh session`);
+      }
       const initialState = initState(config);
       session = createSession(conversation_id, initialState, storyId);
     }
@@ -173,15 +185,16 @@ export async function POST(req: NextRequest) {
     }
 
     // ── If a voice choice is pending, inject directive into system prompt ──
-    // This happens when the previous turn detected a choice beat. Elara
+    // This happens when the previous turn detected a choice beat. The character
     // should present the options verbally so the player can respond by voice.
     if (session.pendingChoice) {
       const choiceLines = session.pendingChoice.options
         .map((opt, i) => `- Option ${i + 1}: ${opt.label}`)
         .join("\n");
+      const charName = config.characters[0]?.name ?? "the character";
       systemPrompt += [
         "\n\n[CHOICE MOMENT] Present these options to the player naturally in your next response.",
-        "Do not list them mechanically — weave them into your dialogue as Elara would.",
+        `Do not list them mechanically — weave them into your dialogue as ${charName} would.`,
         "Make each option sound like a natural suggestion or question:",
         choiceLines,
         "Wait for the player's verbal response before continuing.",
@@ -353,11 +366,11 @@ async function performPostStreamUpdates(
 
     // ── Update conversation history in state ──────────────────────
     const playerTurn: ConversationTurn = { role: "player", text: playerText, timestamp: Date.now() };
-    const elaraTurn: ConversationTurn = { role: "elara", text: cleanText, timestamp: Date.now() };
+    const aiTurn: ConversationTurn = { role: "elara", text: cleanText, timestamp: Date.now() };
 
     let nextState = {
       ...state,
-      conversationHistory: [...state.conversationHistory, playerTurn, elaraTurn],
+      conversationHistory: [...state.conversationHistory, playerTurn, aiTurn],
       elapsedSeconds: state.elapsedSeconds + 30, // rough approximation per turn
     };
 

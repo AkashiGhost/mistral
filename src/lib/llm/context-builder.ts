@@ -83,7 +83,7 @@ function buildWorldAndCharacterLayer(config: GameConfig): string {
   parts.push(`PHYSICS: ${physics.type}`);
   parts.push(`RULES:\n${physics.rules.map((r) => `- ${r}`).join("\n")}`);
 
-  // Character card (first character = Elara)
+  // Character card (first character = primary AI character)
   const char = config.characters[0];
   if (char) {
     parts.push(`CHARACTER: ${char.name} (${char.role})`);
