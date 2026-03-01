@@ -76,12 +76,16 @@ function buildWorldAndCharacterLayer(config: GameConfig): string {
   // Base instruction from system.yaml
   parts.push(config.prompts.system.baseInstruction);
 
-  // World physics rules
-  const { physics, setting } = config.world;
-  parts.push(`SETTING: ${setting.description}`);
-  parts.push(`TIME: ${setting.time}`);
-  parts.push(`PHYSICS: ${physics.type}`);
-  parts.push(`RULES:\n${physics.rules.map((r) => `- ${r}`).join("\n")}`);
+  // World physics rules (optional — stories without world.yaml skip this)
+  const { physics, setting } = config.world ?? {};
+  if (setting) {
+    if (setting.description) parts.push(`SETTING: ${setting.description}`);
+    if (setting.time) parts.push(`TIME: ${setting.time}`);
+  }
+  if (physics) {
+    if (physics.type) parts.push(`PHYSICS: ${physics.type}`);
+    if (physics.rules?.length) parts.push(`RULES:\n${physics.rules.map((r: string) => `- ${r}`).join("\n")}`);
+  }
 
   // Character card (first character = primary AI character)
   const char = config.characters[0];
