@@ -19,7 +19,7 @@ import {
 import { initState, getCurrentBeat, advanceBeat, advancePhase, evaluateEndingCondition, resolveChoice } from "@/lib/state-machine";
 import { buildContext } from "@/lib/llm/context-builder";
 import { parseSoundCues } from "@/lib/sound-cue-parser";
-import { callMistralStory, streamMistralStory, MistralIntentParser } from "@/lib/llm/mistral-adapter";
+import { streamMistralStory } from "@/lib/llm/mistral-adapter";
 import type { ConversationTurn, StoryState } from "@/lib/types/story-state";
 import type { SessionData } from "@/lib/session-store";
 import type { GameConfig, Beat, ChoiceOption } from "@/lib/types/game-config";
@@ -31,8 +31,6 @@ export const runtime = "nodejs";
 function getConfig(storyId?: StoryId): GameConfig {
   return getGameConfig(storyId);
 }
-
-const intentParser = new MistralIntentParser(process.env.MISTRAL_API_KEY!);
 
 const WebhookMessageSchema = z.object({
   role: z.enum(["system", "user", "assistant"]),
@@ -496,22 +494,20 @@ async function performPostStreamUpdates(
       console.log(`[WEBHOOK] Choice detected: none (nextBeat type="${nextBeat?.type ?? "null"}")`);
     }
 
-    // ── Classify intent (async — for style tracker) ──────────────
-    let nextStateWithStyle = nextState;
-    try {
-      console.log(`[WEBHOOK] Style tracking: running intent classification for playerText="${playerText.slice(0, 60)}"`);
-      const intent = await intentParser.parse(playerText, config.prompts.system.intentClassifierPrompt);
-      console.log(`[WEBHOOK] Style tracking: intent="${intent.intent}", emotionalRegister="${intent.emotionalRegister}", challengeLevel="${intent.challengeLevel}"`);
-      const styleImport = await import("@/lib/style-tracker");
-      nextStateWithStyle = styleImport.applyIntentScore(nextState, intent.emotionalRegister);
-      console.log(`[WEBHOOK] Style tracking: applied — playerStyleScores=${JSON.stringify(nextStateWithStyle.playerStyleScores)}`);
-    } catch (styleErr) {
-      const styleError = styleErr as Error;
-      console.error(`[WEBHOOK] Style tracking failed (non-critical): ${styleError.message}`);
-    }
+    // ── Style tracking via intent classification — DISABLED ──────
+    // Mistral Small intent classification adds 3-5s of network latency.
+    // On Vercel Hobby (10s timeout), this pushes the total function time
+    // past the limit, causing Vercel to kill the process mid-response.
+    // The TCP teardown makes ElevenLabs see an incomplete SSE stream,
+    // so the player hears nothing.
+    //
+    // Style tracking is nice-to-have (affects revelation variant at Phase 4),
+    // but gameplay works without it. Re-enable when on Vercel Pro (60s timeout)
+    // or when moved to a background job.
+    console.log(`[WEBHOOK] Style tracking: SKIPPED (Vercel Hobby timeout constraint)`);
 
     updateSession(conversationId, {
-      state: nextStateWithStyle,
+      state: nextState,
       pendingChoice,
       pendingSoundCues: [
         ...(session.pendingSoundCues ?? []),
