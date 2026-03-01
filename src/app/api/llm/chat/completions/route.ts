@@ -9,7 +9,7 @@
 // ─────────────────────────────────────────────
 
 import { NextRequest, NextResponse } from "next/server";
-import { getGameConfig, type StoryId } from "@/lib/config-loader";
+import { getGameConfig, DEFAULT_STORY_ID, type StoryId } from "@/lib/config-loader";
 import {
   getSession,
   createSession,
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Determine story ID — from existing session or from request metadata
-    const requestStoryId = (body.custom_llm_extra_body?.story_id as StoryId | undefined) ?? "the-last-session";
+    const requestStoryId = (body.custom_llm_extra_body?.story_id as StoryId | undefined) ?? DEFAULT_STORY_ID;
 
     // Get or init session state
     let session = getSession(conversation_id);
@@ -169,7 +169,7 @@ export async function POST(req: NextRequest) {
 
     // ── Silence nudge: tell the AI to continue narrating ──────────
     if (isSilenceNudge) {
-      systemPrompt += "\n\n[SILENCE] The player has been silent. Continue the story naturally — advance the scene, describe what happens next, or deepen the atmosphere. Do not ask if the player is still there.";
+      systemPrompt += "\n\n[SILENCE] The player has been silent for a while. If your last response asked a question, gently rephrase or offer a prompt to guide them. If your last response was narration, continue the story naturally — advance the scene or deepen the atmosphere. Keep it to 1-2 sentences. Do not ask if the player is still there.";
     }
 
     // ── If a voice choice is pending, inject directive into system prompt ──
@@ -419,7 +419,7 @@ async function performPostStreamUpdates(
     let nextStateWithStyle = nextState;
     try {
       console.log(`[WEBHOOK] Style tracking: running intent classification for playerText="${playerText.slice(0, 60)}"`);
-      const intent = await intentParser.parse(playerText);
+      const intent = await intentParser.parse(playerText, config.prompts.system.intentClassifierPrompt);
       console.log(`[WEBHOOK] Style tracking: intent="${intent.intent}", emotionalRegister="${intent.emotionalRegister}", challengeLevel="${intent.challengeLevel}"`);
       const styleImport = await import("@/lib/style-tracker");
       nextStateWithStyle = styleImport.applyIntentScore(nextState, intent.emotionalRegister);

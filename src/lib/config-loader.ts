@@ -6,16 +6,16 @@
 import path from "path";
 import { loadStory } from "./story-loader";
 import type { GameConfig } from "./types/game-config";
+import { DEFAULT_STORY_ID, type StoryId } from "./constants";
+
+// Re-export shared constants so existing imports from config-loader still work
+export { STORY_IDS, DEFAULT_STORY_ID, type StoryId } from "./constants";
 
 // Cache configs per story ID to avoid re-parsing YAML on every request
 const configCache = new Map<string, GameConfig>();
 
-/** Valid story IDs — must match directory names under stories/ */
-export const STORY_IDS = ["the-last-session", "the-lighthouse", "room-4b"] as const;
-export type StoryId = (typeof STORY_IDS)[number];
-
 export function getGameConfig(storyId?: StoryId): GameConfig {
-  const id = storyId ?? "the-last-session";
+  const id = storyId ?? DEFAULT_STORY_ID;
 
   // Return cached config if available
   const cached = configCache.get(id);

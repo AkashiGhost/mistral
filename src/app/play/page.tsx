@@ -3,6 +3,7 @@
 import { Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
+import { DEFAULT_STORY_ID } from "@/lib/constants";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
 import { GameSession } from "@/components/game/GameSession";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
@@ -10,7 +11,7 @@ import { BreathingDot } from "@/components/ui/BreathingDot";
 
 function PlayContent() {
   const searchParams = useSearchParams();
-  const storyId = searchParams.get("story") ?? "the-last-session";
+  const storyId = searchParams.get("story") ?? DEFAULT_STORY_ID;
 
   const [onboardingDone, setOnboardingDone] = useState(false);
   const { status, startSession, errorMessage } = useGame();

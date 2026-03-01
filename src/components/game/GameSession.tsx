@@ -10,7 +10,7 @@ import { BreathingDot } from "@/components/ui/BreathingDot";
 // ─────────────────────────────────────────────
 // Game Session — Mistral / ElevenLabs version
 // ElevenLabs handles mic + TTS entirely.
-// We show: Elara's text, speaking/listening state, choice overlay.
+// We show: AI character's text, speaking/listening state, choice overlay.
 // AtmosphereLayer renders for stories with visual atmosphere (Room 4B).
 // Breathing dot adapts animation speed to current story phase.
 // ─────────────────────────────────────────────
@@ -26,10 +26,10 @@ export function GameSession({ storyId }: GameSessionProps) {
   const {
     phase,
     status,
-    lastElaraText,
+    lastAiText,
     isSpeaking,
     isPaused,
-    hasElaraSpoken,
+    hasAiSpoken,
     activeChoice,
     endSession,
     togglePause,
@@ -87,25 +87,25 @@ export function GameSession({ storyId }: GameSessionProps) {
     }
   }, [activeChoice]);
 
-  // ── hasElaraSpoken change logging ────────────────────────────
-  const prevHasElaraSpokenRef = useRef(hasElaraSpoken);
+  // ── hasAiSpoken change logging ────────────────────────────
+  const prevHasAiSpokenRef = useRef(hasAiSpoken);
   useEffect(() => {
-    if (prevHasElaraSpokenRef.current !== hasElaraSpoken) {
-      console.log(`[SESSION] hasElaraSpoken changed: ${prevHasElaraSpokenRef.current} → ${hasElaraSpoken}`);
-      prevHasElaraSpokenRef.current = hasElaraSpoken;
+    if (prevHasAiSpokenRef.current !== hasAiSpoken) {
+      console.log(`[SESSION] hasAiSpoken changed: ${prevHasAiSpokenRef.current} → ${hasAiSpoken}`);
+      prevHasAiSpokenRef.current = hasAiSpoken;
     }
-  }, [hasElaraSpoken]);
+  }, [hasAiSpoken]);
 
-  // TTS fallback: browser speaks Elara's text if ElevenLabs audio not yet received
+  // TTS fallback: browser speaks AI's text if ElevenLabs audio not yet received
   useEffect(() => {
-    if (!lastElaraText || typeof window === "undefined" || !window.speechSynthesis) return;
-    if (hasElaraSpoken) return;
+    if (!lastAiText || typeof window === "undefined" || !window.speechSynthesis) return;
+    if (hasAiSpoken) return;
 
     const timer = setTimeout(() => {
-      if (hasElaraSpoken) return;
+      if (hasAiSpoken) return;
       console.log("[SESSION] TTS fallback triggered — ElevenLabs audio not received, using browser speechSynthesis");
       window.speechSynthesis.cancel();
-      const utt = new SpeechSynthesisUtterance(lastElaraText);
+      const utt = new SpeechSynthesisUtterance(lastAiText);
       utt.rate = 0.85;
       utt.pitch = 0.9;
       utt.volume = 1;
@@ -123,7 +123,7 @@ export function GameSession({ storyId }: GameSessionProps) {
     }, 300);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastElaraText]);
+  }, [lastAiText]);
 
   if (status === "ended") {
     return (
@@ -150,7 +150,7 @@ export function GameSession({ storyId }: GameSessionProps) {
             maxWidth: "32ch",
           }}
         >
-          {lastElaraText || "The session has ended."}
+          {lastAiText || "The session has ended."}
         </p>
         <a
           href="/"
@@ -224,7 +224,7 @@ export function GameSession({ storyId }: GameSessionProps) {
         >
           {/* Breathing / speaking indicator — phase-aware animation */}
           <BreathingDot size={12} phase={phase} isSpeaking={isSpeaking} />
-          {status === "playing" && !hasElaraSpoken && (
+          {status === "playing" && !hasAiSpoken && (
             <p
               style={{
                 color: "var(--muted)",
@@ -241,8 +241,8 @@ export function GameSession({ storyId }: GameSessionProps) {
         </div>
       </div>
 
-      {/* Elara's last text — subtle, for accessibility */}
-      {lastElaraText && (
+      {/* AI character's last text — subtle, for accessibility */}
+      {lastAiText && (
         <div
           style={{
             padding: "var(--space-sm) var(--space-md)",
@@ -255,7 +255,7 @@ export function GameSession({ storyId }: GameSessionProps) {
             overflow: "hidden",
           }}
         >
-          {lastElaraText}
+          {lastAiText}
         </div>
       )}
 
@@ -279,7 +279,7 @@ export function GameSession({ storyId }: GameSessionProps) {
           border: 0,
         }}
       >
-        {lastElaraText}
+        {lastAiText}
       </div>
 
       {/* Pause overlay */}

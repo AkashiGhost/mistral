@@ -7,7 +7,7 @@
 
 import type { StoryState } from "./types/story-state";
 import type { ChoicePromptPayload } from "./types/llm";
-import type { StoryId } from "./config-loader";
+import { DEFAULT_STORY_ID, type StoryId } from "./config-loader";
 
 export interface SessionData {
   storyId: StoryId;
@@ -38,7 +38,7 @@ export function getSession(conversationId: string): SessionData | undefined {
   return session;
 }
 
-export function createSession(conversationId: string, initialState: StoryState, storyId: StoryId = "the-last-session"): SessionData {
+export function createSession(conversationId: string, initialState: StoryState, storyId: StoryId = DEFAULT_STORY_ID): SessionData {
   evictStale();
   const session: SessionData = {
     storyId,

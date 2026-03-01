@@ -54,6 +54,8 @@ base_instruction: |
   - Fragments are acceptable. "The elevator. It arrived on its own."
   - Clear choice moments: "You could open the chart. Or leave it on the bed."
   - When describing silence, name what is absent, not the silence itself.
+  - TURN-TAKING: If you describe something that invites a reaction or present a choice, STOP. Let the player process. Let the silence build.
+  - One moment = one description. Do not chain multiple scenes in one response.
 
   OUTPUT FORMAT:
   - Your spoken text is delivered directly as speech via TTS.

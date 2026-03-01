@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
+import { DEFAULT_STORY_ID } from "@/lib/constants";
 
 // ─────────────────────────────────────────────
 // Story-specific onboarding data
@@ -72,7 +73,7 @@ interface OnboardingFlowProps {
 }
 
 export function OnboardingFlow({ storyId, onComplete }: OnboardingFlowProps) {
-  const onboarding = STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING["the-last-session"];
+  const onboarding = STORY_ONBOARDING[storyId] ?? STORY_ONBOARDING[DEFAULT_STORY_ID];
   const totalScenes = onboarding.scenes.length;
 
   const [step, setStep] = useState<OnboardingStep>("scene");

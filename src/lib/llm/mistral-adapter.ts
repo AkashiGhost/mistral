@@ -20,23 +20,28 @@ export class MistralIntentParser implements IntentParser {
     this.client = new Mistral({ apiKey });
   }
 
-  async parse(playerText: string): Promise<IntentResult> {
+  async parse(playerText: string, intentClassifierPrompt?: string): Promise<IntentResult> {
     console.log(`[INTENT] parse called — input: "${playerText.slice(0, 100)}${playerText.length > 100 ? "..." : ""}"`);
+    console.log(`[INTENT] Using ${intentClassifierPrompt ? "story-specific" : "default"} intent classifier prompt`);
 
-    const prompt = `You are an intent classifier for a voice-based horror therapy game.
-The player is a therapist speaking to a patient named Elara.
-
+    const defaultPrompt = `You are an intent classifier for a voice-based interactive story.
 Classify the following player input. Return ONLY valid JSON, no markdown.
 
 Player said: "${playerText}"
 
 Return JSON:
 {
-  "intent": one of ["speak_to_elara","ask_question","express_emotion","try_to_leave","try_phone","try_call_help","try_end_session","stand_up","look_around","silence","other"],
+  "intent": one of ["speak","ask_question","express_emotion","try_to_leave","look_around","silence","other"],
   "emotionalRegister": one of ["empathetic","analytical","nurturing","confrontational","neutral"],
   "keyPhrase": the most significant phrase from the input,
   "challengeLevel": one of ["low","medium","high"]
 }`;
+
+    // Story-specific prompts from YAML include the full classifier instructions
+    // but need the player's input appended
+    const prompt = intentClassifierPrompt
+      ? `${intentClassifierPrompt}\n\nPlayer said: "${playerText}"\n\nReturn ONLY the JSON object.`
+      : defaultPrompt;
 
     try {
       console.log(`[INTENT] Calling Mistral Small (${INTENT_MODEL}) for intent classification`);
@@ -65,7 +70,7 @@ Return JSON:
       const error = err as Error;
       console.error(`[INTENT] Parse failed — ${error.message} — falling back to defaults`);
       return {
-        intent: "speak_to_elara",
+        intent: "other",
         emotionalRegister: "neutral",
         keyPhrase: playerText,
         challengeLevel: "medium",
@@ -88,7 +93,7 @@ export async function callMistralStory(
     model: STORY_MODEL,
     messages,
     temperature: 0.85,
-    maxTokens: 300,
+    maxTokens: 200, // Tighter responses encourage turn-taking
   });
   return String(response.choices?.[0]?.message?.content ?? "");
 }
@@ -102,7 +107,7 @@ export async function* streamMistralStory(
   apiKey: string,
   messages: Array<{ role: "system" | "user" | "assistant"; content: string }>,
 ): AsyncGenerator<string> {
-  console.log(`[MISTRAL] streamMistralStory called — model=${STORY_MODEL}, messageCount=${messages.length}, temperature=0.85, maxTokens=300`);
+  console.log(`[MISTRAL] streamMistralStory called — model=${STORY_MODEL}, messageCount=${messages.length}, temperature=0.85, maxTokens=200`);
 
   const client = new Mistral({ apiKey });
 
@@ -113,7 +118,7 @@ export async function* streamMistralStory(
       model: STORY_MODEL,
       messages,
       temperature: 0.85,
-      maxTokens: 300,
+      maxTokens: 200, // Tighter responses encourage turn-taking
     });
     console.log(`[MISTRAL] Stream opened successfully`);
   } catch (err) {

@@ -46,7 +46,7 @@ export interface StoryEngine {
  */
 export interface IntentParser {
   /** Parse player text into a structured intent */
-  parse(playerText: string): Promise<IntentResult>;
+  parse(playerText: string, intentClassifierPrompt?: string): Promise<IntentResult>;
 }
 
 // === WebSocket Protocol ===

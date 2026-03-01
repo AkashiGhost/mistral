@@ -13,7 +13,7 @@ import {
   clearSoundCues,
   updateSession,
 } from "@/lib/session-store";
-import { getGameConfig, type StoryId } from "@/lib/config-loader";
+import { getGameConfig, DEFAULT_STORY_ID, type StoryId } from "@/lib/config-loader";
 import { initState } from "@/lib/state-machine";
 
 export const runtime = "nodejs";
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing conversationId" }, { status: 400 });
   }
 
-  const resolvedStoryId = storyId ?? "the-last-session";
+  const resolvedStoryId = storyId ?? DEFAULT_STORY_ID;
   console.log(`[GAME-STATE] POST init for cid=${conversationId}, storyId=${resolvedStoryId}`);
 
   let config;

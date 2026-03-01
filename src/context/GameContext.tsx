@@ -11,6 +11,7 @@ import {
 } from "react";
 import { useConversation } from "@elevenlabs/react";
 import type { ChoicePromptPayload } from "@/lib/types/llm";
+import { DEFAULT_STORY_ID } from "@/lib/constants";
 
 // ─────────────────────────────────────────────
 // Game context — ElevenLabs ConvAI + game state polling
@@ -25,10 +26,10 @@ interface GameContextValue {
   trustLevel: number;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   activeChoice: ChoicePromptPayload | null;
-  lastElaraText: string;
+  lastAiText: string;
   pendingSoundCues: Array<{ soundId: string; position: number }>;
-  hasElaraSpoken: boolean;
-  /** Whether Elara is currently speaking (ElevenLabs TTS) */
+  hasAiSpoken: boolean;
+  /** Whether the AI character is currently speaking (ElevenLabs TTS) */
   isSpeaking: boolean;
   /** Whether the game is paused */
   isPaused: boolean;
@@ -49,9 +50,9 @@ type UIState = {
   trustLevel: number;
   status: "idle" | "connecting" | "playing" | "ended" | "error";
   activeChoice: ChoicePromptPayload | null;
-  lastElaraText: string;
+  lastAiText: string;
   pendingSoundCues: Array<{ soundId: string; position: number }>;
-  hasElaraSpoken: boolean;
+  hasAiSpoken: boolean;
   isPaused: boolean;
   errorMessage: string | null;
   conversationId: string | null;
@@ -62,7 +63,7 @@ type UIAction =
   | { type: "SET_CONVERSATION_ID"; id: string | null }
   | { type: "STATE_POLL"; payload: Record<string, unknown> }
   | { type: "CLEAR_CHOICE" }
-  | { type: "ELARA_TEXT"; text: string }
+  | { type: "AI_TEXT"; text: string }
   | { type: "ADD_SOUND_CUES"; cues: Array<{ soundId: string; position: number }> }
   | { type: "CLEAR_SOUND_CUES" }
   | { type: "GAME_OVER" }
@@ -93,8 +94,8 @@ function uiReducer(state: UIState, action: UIAction): UIState {
     case "CLEAR_CHOICE":
       console.log("[GAME] Reducer: CLEAR_CHOICE");
       break;
-    case "ELARA_TEXT":
-      console.log(`[GAME] Reducer: ELARA_TEXT → "${action.text.slice(0, 80)}${action.text.length > 80 ? "…" : ""}"`);
+    case "AI_TEXT":
+      console.log(`[GAME] Reducer: AI_TEXT → "${action.text.slice(0, 80)}${action.text.length > 80 ? "…" : ""}"`);
       break;
     case "ADD_SOUND_CUES":
       console.log(`[GAME] Reducer: ADD_SOUND_CUES → ${action.cues.length} cue(s):`, action.cues);
@@ -138,8 +139,8 @@ function uiReducer(state: UIState, action: UIAction): UIState {
       };
     case "CLEAR_CHOICE":
       return { ...state, activeChoice: null };
-    case "ELARA_TEXT":
-      return { ...state, lastElaraText: action.text, hasElaraSpoken: true };
+    case "AI_TEXT":
+      return { ...state, lastAiText: action.text, hasAiSpoken: true };
     case "ADD_SOUND_CUES":
       return {
         ...state,
@@ -165,9 +166,9 @@ const initialUIState: UIState = {
   trustLevel: 3,
   status: "idle",
   activeChoice: null,
-  lastElaraText: "",
+  lastAiText: "",
   pendingSoundCues: [],
-  hasElaraSpoken: false,
+  hasAiSpoken: false,
   isPaused: false,
   errorMessage: null,
   conversationId: null,
@@ -182,7 +183,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // How long to wait (ms) before auto-nudging the AI to continue narrating
-  const SILENCE_TIMEOUT_MS = 8000;
+  const SILENCE_TIMEOUT_MS = 12000; // 12 seconds — give players time to think
 
   // ── Stop polling helper ───────────────────────────────────────
   const stopPolling = useCallback(() => {
@@ -269,7 +270,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
   const stableOnMessage = useCallback(({ message, source }: { message: string; source: string }) => {
     console.log(`[GAME] Message from ${source}: "${message.slice(0, 100)}${message.length > 100 ? "…" : ""}"`);
     if (source === "ai" && message) {
-      dispatch({ type: "ELARA_TEXT", text: message });
+      dispatch({ type: "AI_TEXT", text: message });
       void pollGameStateRef.current();
     }
     if (source === "user") {
@@ -313,8 +314,8 @@ export function GameProvider({ children }: { children: ReactNode }) {
   // ── Start session ─────────────────────────────────────────────
   const startSession = useCallback(async (storyId?: string, firstMessage?: string) => {
     dispatch({ type: "SET_STATUS", status: "connecting" });
-    const resolvedStoryId = storyId ?? "the-last-session";
-    const resolvedFirstMessage = firstMessage ?? "... Hello, Doctor. Thank you for seeing me tonight.";
+    const resolvedStoryId = storyId ?? DEFAULT_STORY_ID;
+    const resolvedFirstMessage = firstMessage ?? "...";
 
     try {
       const agentId = process.env.NEXT_PUBLIC_ELEVENLABS_AGENT_ID;

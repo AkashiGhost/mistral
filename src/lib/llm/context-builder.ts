@@ -11,7 +11,7 @@
 import type { GameConfig, Phase, Beat } from "../types/game-config";
 import type { StoryState, ConversationTurn } from "../types/story-state";
 
-const MAX_RECENT_TURNS = 6; // Last 3 exchanges (player + elara each)
+const MAX_RECENT_TURNS = 6; // Last 3 exchanges (player + AI each)
 const MAX_COMPRESSED_TURNS = 20;
 
 export interface BuiltContext {
@@ -43,12 +43,12 @@ export function buildContext(
   console.log(`[CONTEXT] Layer 2 (phase override): ${layer2.length} chars (~${Math.round(layer2.length / 4)} tokens)`);
 
   // Layer 3: Recent exchange summary
-  const layer3 = buildRecentExchangeLayer(state);
+  const layer3 = buildRecentExchangeLayer(state, config);
   layers.push(layer3);
   console.log(`[CONTEXT] Layer 3 (recent exchanges): ${layer3.length} chars (~${Math.round(layer3.length / 4)} tokens)`);
 
   // Layer 4: Compressed history
-  const layer4 = buildCompressedHistoryLayer(state);
+  const layer4 = buildCompressedHistoryLayer(state, config);
   layers.push(layer4);
   console.log(`[CONTEXT] Layer 4 (compressed history): ${layer4.length} chars (~${Math.round(layer4.length / 4)} tokens)`);
 
@@ -137,12 +137,13 @@ function buildPhaseOverrideLayer(
   return parts.join("\n\n");
 }
 
-function buildRecentExchangeLayer(state: StoryState): string {
+function buildRecentExchangeLayer(state: StoryState, config: GameConfig): string {
   const recent = state.conversationHistory.slice(-MAX_RECENT_TURNS);
   if (recent.length === 0) return "RECENT EXCHANGES: (session just started)";
 
+  const aiName = config.characters[0]?.name ?? "AI";
   const lines = recent.map((turn) => {
-    const speaker = turn.role === "player" ? "THERAPIST" : "ELARA";
+    const speaker = turn.role === "player" ? "PLAYER" : aiName.toUpperCase();
     // Truncate long turns
     const text =
       turn.text.length > 200
@@ -154,7 +155,7 @@ function buildRecentExchangeLayer(state: StoryState): string {
   return `RECENT EXCHANGES:\n${lines.join("\n")}`;
 }
 
-function buildCompressedHistoryLayer(state: StoryState): string {
+function buildCompressedHistoryLayer(state: StoryState, config: GameConfig): string {
   // Only compress if we have more turns than the recent window
   if (state.conversationHistory.length <= MAX_RECENT_TURNS) {
     return "";
@@ -167,17 +168,20 @@ function buildCompressedHistoryLayer(state: StoryState): string {
 
   if (older.length === 0) return "";
 
+  const aiName = config.characters[0]?.name ?? "AI";
+  const aiInitial = aiName[0] ?? "A";
+
   // Compress to one-line summaries
   const summaries: string[] = [];
   for (let i = 0; i < older.length; i += 2) {
     const playerTurn = older[i];
-    const elaraTurn = older[i + 1];
+    const aiTurn = older[i + 1];
     if (playerTurn) {
       const playerSnippet = playerTurn.text.slice(0, 60);
-      const elaraSnippet = elaraTurn
-        ? elaraTurn.text.slice(0, 60)
+      const aiSnippet = aiTurn
+        ? aiTurn.text.slice(0, 60)
         : "(no response)";
-      summaries.push(`T: ${playerSnippet}... → E: ${elaraSnippet}...`);
+      summaries.push(`P: ${playerSnippet}... → ${aiInitial}: ${aiSnippet}...`);
     }
   }
 
@@ -188,19 +192,23 @@ function buildStateSnapshotLayer(
   state: StoryState,
   currentPhase: Phase,
 ): string {
-  const snapshot = {
+  const snapshot: Record<string, unknown> = {
     current_phase: currentPhase.id,
     phase_index: state.currentPhaseIndex,
     beat_index: state.currentBeatIndex,
     elapsed_seconds: state.elapsedSeconds,
-    trust_level: state.elara.trustLevel,
-    emotional_state: state.elara.emotionalState,
-    secrets_revealed: state.elara.secretsRevealed,
     player_style_scores: state.playerStyleScores,
     sounds_removed: state.soundsRemoved,
     choices_made: state.choicesMade,
-    active_variant: state.elara.activeVariant,
   };
+
+  // Add character state if it exists (story-specific)
+  if (state.elara) {
+    snapshot.character_trust = state.elara.trustLevel;
+    snapshot.character_emotion = state.elara.emotionalState;
+    snapshot.secrets_revealed = state.elara.secretsRevealed;
+    snapshot.active_variant = state.elara.activeVariant;
+  }
 
   return `STATE:\n${JSON.stringify(snapshot, null, 2)}`;
 }
