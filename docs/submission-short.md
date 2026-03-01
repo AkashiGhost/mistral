@@ -2,30 +2,32 @@
 
 ## Ultra-Short (500 chars max)
 
-**InnerPlay** is a voice-only immersive horror game where you close your eyes, speak, and play. Zero UI. Pure imagination. Powered by Mistral Large for dynamic in-character narration with sound markers, Mistral Small for real-time intent classification, and ElevenLabs ConvAI for bidirectional voice. The game engine is deterministic TypeScript—code decides game logic, LLM narrates. 14K+ lines of YAML story content. 3 stories, 17 endings, complete style tracking.
+**InnerPlay** is a voice-only immersive horror game where you close your eyes, speak, and play. Zero UI. Pure imagination. Powered by Mistral Large for dynamic in-character narration and ElevenLabs ConvAI for bidirectional voice. The engine is deterministic TypeScript -- code drives sound design, LLM narrates the story. Featured: "The Call" -- guide a stranger out of an underground facility before the line goes dead.
 
-**[443 characters]**
+**[432 characters]**
 
 ---
 
 ## Medium (1500 chars max)
 
 **The Problem:**
-Games are visual-first and exclude imagination. Interactive fiction is stuck in text. Voice AI serves assistants, never entertainment. There's no product combining AI narration + voice interaction + cinematic sound design for immersive storytelling.
+Games are visual-first and exclude imagination. Interactive fiction is stuck in text boxes. Voice AI serves assistants, never entertainment. There is no product combining AI narration + real-time voice interaction + cinematic sound design for immersive storytelling.
 
 **The Solution:**
-InnerPlay breaks the "text box" paradigm completely. You put on headphones, close your eyes, and speak—that's the entire interface. Play a 10-minute psychological horror game ("The Last Session") where you're a therapist meeting your final patient, Elara. She knows things she shouldn't. The building goes silent. She turns the questions on you. Your therapy style—empathetic, analytical, nurturing, confrontational—determines one of 4 revelation variants. 3 choice points. 17 endings. No screens. Pure voice.
+InnerPlay breaks the "text box" paradigm completely. You put on headphones, close your eyes, and speak -- that's the entire interface. Featured story: "The Call." Your phone rings. You answer. A stranger named Alex is trapped underground -- concrete room, no exit they can see, rising water somewhere below. You are the only one they reached. You guide them out by voice alone.
+
+Wrong choices kill Alex. The phone goes quiet. Then it rings again. Alex accumulates memory across deaths -- by the third loop, they know they've been here before. They need you to get it right this time. Three revelation variants emerge based on how you guide: controller, recording, or many-calls. One final choice. Then the line simply goes quiet.
 
 **Technical Stack:**
-- **Mistral Large**: Real-time narration with inline [SOUND:x] markers, 300-token conversational pacing, streamed token-by-token to ElevenLabs for sub-second TTFV
-- **Mistral Small**: Async intent classification (11 categories + emotional register) feeding the player style tracker
-- **ElevenLabs ConvAI**: WebRTC voice I/O with automatic VAD and turn-taking
-- **Web Audio API**: Spatial sound, 3D ambient layers, dynamic ducking, subtractive horror design
-- **Story Engine**: 31 YAML files (14K+ lines), pure TypeScript state machine and rules engine
+- **Mistral Large**: Real-time in-character narration, streamed token-by-token to ElevenLabs TTS
+- **ElevenLabs ConvAI**: WebRTC voice I/O -- STT, VAD, turn-taking, calls Mistral directly (no custom webhook)
+- **Web Audio API**: All sounds synthesized in-browser via OfflineAudioContext -- no audio files, no CDN
+- **Sound Design**: Deterministic timeline (authored events at specific timestamps) + keyword regex on AI narration text -- no [SOUND:x] markers needed
+- **Architecture**: Client-side state only (React useReducer). One server route: /api/signed-url.
 
 **Key Differentiator:**
-Code decides game logic (state machine, rules, endings). The LLM only narrates—no hallucinated game states. Stories are data files, not code. The engine is provider-agnostic: swap adapters and the same story runs on any LLM.
+Code decides sound design and pacing (deterministic timeline, keyword detection, TTS ducking). Mistral's only job is to be the character -- fully in-world, never breaking. The system prompt does the work of a full game script.
 
 **Live Demo:** https://mistral-lac.vercel.app
 
-**[1,298 characters]**
+**[1,489 characters]**

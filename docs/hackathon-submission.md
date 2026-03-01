@@ -23,33 +23,37 @@ InnerPlay **breaks the "text box" paradigm completely**. There is zero visual UI
 Players **put on headphones, close their eyes, and speak**. That's the entire interface.
 
 - AI characters respond in real-time with emotional, contextual narration
-- A deterministic game engine tracks player behavior, choices, and therapy style to create branching narratives
+- A deterministic sound engine builds and dismantles a world around you over time
 - Spatial sound design (3D audio, ambient layers, subtractive horror cues) creates a world you *hear* rather than see
-- Stories are data files, not code -- the engine is genre-agnostic and extensible
+- Stories are system prompts and TypeScript timelines -- the engine is genre-agnostic and extensible
 
-**The ritual entry IS the game.** When Elara says "Close your eyes... take a breath in..." the audio layers load, the ambient soundscape builds, and the player is inside the story before they realize it started.
+**The ritual entry IS the game.** The phone rings. You pick up. The voice on the other end needs your help. The ambient layers begin. You are inside the story before you realize it started.
 
 ---
 
-## Featured Story: "The Last Session"
+## Featured Story: "The Call"
 
-A **10-minute psychological horror experience**.
+A **10-minute survival thriller with a time loop**.
 
-You are a therapist. Your last patient, Elara, arrives for an emergency session. She's calm -- too calm. As the session progresses:
+Your phone rings. You answer. A stranger named Alex is trapped somewhere underground -- concrete room, metal door, no handle on their side. Your number was the only one that connected. You are their only lifeline.
 
-1. **She knows things no patient should know** -- your coffee order, your unspoken thoughts
-2. **The building goes silent** -- elevator hum, footsteps above, HVAC disappear one by one
-3. **She starts asking YOU questions** -- the power dynamic inverts
-4. **2 seconds of absolute silence. Then a single low tone.** The revelation: what Elara IS depends on how you played.
+**You guide. Alex acts.**
 
-**The story adapts to you:**
-- 5 phases of escalating tension
-- 3 choice points with natural language input (not "option A or B")
-- **4 revelation variants** based on YOUR therapy style (empathetic, analytical, nurturing, confrontational)
-- **17 possible endings** evaluated by a rules engine
-- One moment where your agency is **revoked** -- horror mechanic: "You said stay silent. But your voice came out anyway."
+- Alex describes the space in real time: the keypad, the vent, the pipes, the sounds from somewhere below
+- You choose the path. Every wrong choice ends fatally
+- When Alex dies, the phone goes quiet. Then it rings again: "Hello? Is... is someone there?"
+- **The time loop is a game mechanic, not a narrative conceit.** Alex accumulates memory across deaths. By the third loop, Alex knows they've died before. Knows your voice. Needs you to get it right this time.
 
-Built on 14,000+ lines of hand-written YAML story content across 31 files -- world rules, character cards, phase behaviors, sound timelines, and ending conditions. Plus 2 additional stories (The Lighthouse, Room 4B) demonstrating the engine's versatility.
+**Three revelation variants** determined by how you guide:
+- Methodical and precise? Alex finds a screen showing you're not outside -- you're in a control room running the trial. You are the experiment.
+- Emotionally present? Alex hears a recording of the call playing back things they haven't said yet. The phone call already happened. Alex may not be alive on this phone.
+- Hesitant, second-guessing? Alex finds a room full of active phones -- your voice on every one, guiding different versions of Alex through different paths. None of them have made it out yet.
+
+**The ending depends on a single final choice** -- open the door or wait -- and Alex's last words echo something from the very first exchange of this call, returned with different weight. Then the line simply goes quiet.
+
+Built around a full authored system prompt with phase-aware narration, a time-loop mechanic, branching revelations, and a multi-layer synthetic soundscape driven by a deterministic timeline and keyword detection.
+
+*3 stories coming soon: The Last Session, The Lighthouse, Room 4B.*
 
 ---
 
@@ -62,80 +66,123 @@ Player speaks
 ElevenLabs ConvAI (WebRTC) -- captures voice, handles VAD + turn-taking
     |
     v
-Custom LLM Webhook (/api/llm/chat/completions)
+ElevenLabs forwards conversation history to Mistral Large directly
+(system prompt injected from client at session start)
     |
     v
-5-Layer Context Builder:
-    1. World rules + character card (~600 tokens)
-    2. Phase behavior override (~300 tokens)
-    3. Recent exchange summary (~400 tokens)
-    4. Compressed conversation history (~200 tokens)
-    5. Live game state snapshot (~100 tokens)
+Mistral Large -- streams in-character narration
     |
     v
-Mistral Large -- generates in-character narration with [SOUND:x] markers
+ElevenLabs TTS -- converts to character voice with emotional expression
     |
     v
-SSE stream -- tokens flow to ElevenLabs in real-time (sub-second TTFV)
-    |            Sound markers stripped before TTS, parsed for game state
-    v
-ElevenLabs TTS -- converts to Elara's voice with emotional expression
+WebRTC audio returns to browser
     |
     v
-Web Audio API -- mixes voice + ambient layers + spatial sound + dynamic ducking
+Client-side sound engine runs in parallel:
+  - Keyword regex on AI narration text → fires reactive sound cues
+  - Deterministic timeline → ambient layer progression
+  - TTS ducking: -6dB when character speaks, restore when they stop
     |
     v
 Player hears a living world through headphones
 ```
 
-**Post-stream (fire-and-forget, doesn't block TTS):**
-Sound cues fire. Beat advances. Phase transitions evaluate. Player style scores accumulate. Ending conditions check. The game state machine runs deterministically -- the AI never decides game logic.
+**There is no server in the voice path.** The only server route is `/api/signed-url`, which exchanges the secret API key for a short-lived token. Everything else -- game state, sound cues, transcript -- lives in the browser.
 
 ---
 
 ## Mistral AI Integration
 
-Mistral is the brain of InnerPlay. Two models, two roles:
+Mistral Large is the voice of every character in InnerPlay.
 
 ### Mistral Large -- Story Narration Engine
 - Generates all in-character dialogue and narration
-- Respects world rules, character constraints, and phase behavior directives
-- Produces `[SOUND:remove_hvac]` markers inline for real-time sound design
-- **Token-by-token streaming** to ElevenLabs -- the player hears Elara's first words while the rest of the response is still generating
-- Temperature 0.85 for creative but grounded output; 300 token cap per turn for conversational pacing
+- Called directly by ElevenLabs -- no custom webhook, no server hop in the voice path
+- System prompt injected at session start via `overrides.agent.prompt.prompt` -- story context, character voice, phase arc, and forbidden phrases all loaded client-side
+- **Token-by-token streaming** to ElevenLabs -- the player hears the character's first words while the rest of the response is still generating
+- Self-manages phase progression based on exchange count, guided by the prompt
 
-### Mistral Small -- Intent Classification
-- Classifies every player utterance: intent type (11 categories) + emotional register (5 types) + challenge level
-- Runs async after the response streams -- never blocks the voice pipeline
-- Feeds the **player style tracker**: empathetic/analytical/nurturing/confrontational scores accumulate across the session
-- At Phase 4, the dominant style selects which of 4 revelation variants the player experiences
+### Prompt Engineering: Story System Prompts
+Each story has a single carefully authored system prompt that does the work of all per-turn context:
+- **Character voice rules** -- forbidden phrases, sentence length, emotional register, what the character knows and doesn't
+- **Phase arc** -- how the story should evolve across exchanges without explicit turn counting
+- **Sound integration** -- instructions to describe things naturally (the keyword system handles audio; no `[SOUND:x]` markers needed)
+- **Ending conditions** -- when and how the experience concludes
 
-### Prompt Engineering: 5-Layer Context System
-The context builder assembles a **~1,600 token system prompt** per turn that keeps Mistral grounded:
-- **Layer 1**: Immutable world physics + Elara's character card (voice rules, forbidden phrases, max sentences)
-- **Layer 2**: Phase-specific behavior override (how Elara acts RIGHT NOW)
-- **Layer 3**: Last 3 exchanges verbatim (short-term memory)
-- **Layer 4**: Compressed earlier history (long-term context)
-- **Layer 5**: Live state JSON (trust level, secrets revealed, sounds removed, choices made, style scores)
-
-**Code decides. LLM narrates.** The state machine, rules engine, and ending evaluator are pure TypeScript functions. Mistral never hallucinates game state because it never controls game state.
+**Code decides the soundscape. LLM narrates the story.** The timeline executor, keyword detection, and TTS ducking are deterministic TypeScript. Mistral's only job is to be the character.
 
 ---
 
-## Architecture: Code Decides, LLM Narrates
+## Architecture: Direct-Wire, Browser-First
 
-This is a **pipeline, not an agentic system**. No autonomous agents, no multi-step tool orchestration. Each step feeds the next sequentially.
+This is a **pipeline, not an agentic system**. No autonomous agents, no multi-step tool orchestration. ElevenLabs calls Mistral directly; the browser handles everything else.
+
+```mermaid
+flowchart TB
+    subgraph Browser["Browser (Next.js React App)"]
+        UI["Game UI<br/><small>GameSession + OnboardingFlow</small>"]
+        GC["Game State<br/><small>GameContext + useReducer</small>"]
+        SE["Sound Engine<br/><small>Web Audio API</small>"]
+        EL_SDK["ElevenLabs React SDK<br/><small>useConversation hook</small>"]
+        SCP["Sound Cue Parser<br/><small>Keyword regex → one-shot cues</small>"]
+        TL["Timeline Executor<br/><small>Time-triggered ambient events</small>"]
+    end
+
+    subgraph ElevenLabs["ElevenLabs ConvAI Platform"]
+        WS["WebRTC Session Manager"]
+        STT["STT<br/><small>Speech-to-Text</small>"]
+        TTS["TTS<br/><small>Character voice</small>"]
+    end
+
+    subgraph Mistral["Mistral AI"]
+        ML["Mistral Large<br/><small>Story narration, streaming</small>"]
+    end
+
+    subgraph Vercel["Vercel (Next.js)"]
+        SU["/api/signed-url<br/><small>Only server route — exchanges API key for token</small>"]
+    end
+
+    subgraph Content["Story Content (TypeScript)"]
+        SP["System Prompts<br/><small>story-prompts.ts — per-story</small>"]
+        TIMELINES["Sound Timelines<br/><small>useSoundEngine.ts</small>"]
+        SYNTH["Synth Sounds<br/><small>synth-sounds.ts — OfflineAudioContext</small>"]
+    end
+
+    Browser -- "1. GET /api/signed-url" --> SU
+    SU -- "2. signedUrl (temp token)" --> Browser
+    UI -- "Mic audio" --> EL_SDK
+    EL_SDK -- "3. startSession(signedUrl,<br/>overrides.agent.prompt)" --> WS
+    WS --> STT
+    STT -- "Conversation history + system prompt" --> ML
+    ML -- "Streaming response" --> TTS
+    TTS -- "WebRTC audio" --> EL_SDK
+    EL_SDK -- "Speaker output" --> UI
+    EL_SDK -- "onMessage(aiText)" --> GC
+    GC -- "lastAiText" --> SCP
+    SCP -- "matched cues" --> SE
+    TL -- "time-triggered events" --> SE
+    SP -- "prompt override at session start" --> EL_SDK
+    TIMELINES -- "timeline events" --> TL
+    SYNTH -- "AudioBuffers" --> SE
+    EL_SDK -- "isSpeaking flag" --> SE
+
+    style Browser fill:#1a1a2e,stroke:#e94560,color:#eee
+    style ElevenLabs fill:#0f3460,stroke:#533483,color:#eee
+    style Mistral fill:#2b1055,stroke:#d63384,color:#eee
+    style Vercel fill:#16213e,stroke:#e94560,color:#eee
+    style Content fill:#1a1a2e,stroke:#533483,color:#eee
+```
 
 | Component | What It Does | Tech |
 |---|---|---|
-| **State Machine** | Pure functions: initState, advanceBeat, advancePhase, resolveChoice, evaluateEndingCondition | TypeScript |
-| **Rules Engine** | Validates player actions against world physics, enforces constraints | TypeScript |
-| **Context Builder** | 5-layer system prompt assembly per turn | TypeScript |
-| **Style Tracker** | Accumulates player therapy style scores from intent classification | TypeScript + Mistral Small |
-| **Sound Cue Parser** | Extracts `[SOUND:x]` markers from full response, strips before TTS | Regex |
-| **Sound Engine** | Web Audio API: spatial channels, loop management, crossfade ducking, timeline execution | Web Audio API |
-| **Story Content** | 31 YAML files defining world, characters, arc, phases, beats, choices, endings, sounds | YAML |
-| **Webhook** | ElevenLabs Custom LLM endpoint: receives conversation, injects context, streams Mistral, updates state | Next.js API Route |
+| **Game State** | useReducer: status, elapsedSeconds, isSpeaking, transcript, conversationId | React (client-only) |
+| **Sound Cue Parser** | Regex keyword match on AI narration text → one-shot cue IDs, 30s cooldown per sound | TypeScript |
+| **Timeline Executor** | Pre-authored time-based events (fade_in, fade_out, hard_stop, mute_all) polled every 100ms | TypeScript |
+| **Sound Engine** | Web Audio API: spatial channels, loop management, crossfade ducking, OfflineAudioContext synthesis | Web Audio API |
+| **Story Prompts** | Per-story TypeScript strings injected at session start via ElevenLabs SDK override | TypeScript |
+| **Synth Sounds** | Generates all audio procedurally in-browser (no audio files) | OfflineAudioContext |
+| **/api/signed-url** | Only server-side route -- exchanges `ELEVENLABS_API_KEY` for short-lived signed URL | Next.js API Route |
 
 ---
 
@@ -143,15 +190,15 @@ This is a **pipeline, not an agentic system**. No autonomous agents, no multi-st
 
 **1. Zero-UI gameplay.** Nothing like it exists. You close your eyes to play. The screen goes dark. Your imagination is the renderer.
 
-**2. Code decides, LLM narrates.** Game logic is deterministic TypeScript. The AI handles narration only. No hallucinated game states, no narrative drift, no broken puzzles.
+**2. Direct-wire AI voice.** ElevenLabs calls Mistral directly -- no intermediary server, no session store, no polling. The system prompt is injected from the client at session start. Voice-to-voice latency is ~1-1.5 seconds.
 
-**3. Stories are data, not code.** 31 YAML files define "The Last Session" -- world rules, character cards, phase behaviors, sound timelines, ending conditions. Anyone can write a new story without touching the engine.
+**3. Sound as a game mechanic.** Two parallel systems drive the soundscape: a deterministic timeline (authored events at specific timestamps) and a keyword detection layer (AI says "footsteps" → footsteps play). Neither requires the AI to do anything special.
 
-**4. Style tracking changes the story.** The game doesn't just track WHAT you choose -- it tracks HOW you play. An empathetic therapist gets a different revelation than a confrontational one. Same story, fundamentally different experience.
+**4. All sounds synthesized in-browser.** Every ambient layer, every one-shot cue -- generated procedurally via `OfflineAudioContext`. No audio files to serve. No CDN latency. The entire sound palette is parameterized TypeScript.
 
-**5. Subtractive sound design.** Horror through *removal*. Sounds disappear one by one (elevator, footsteps, HVAC, clock) until only rain remains. Then 2 seconds of absolute silence. Your brain fills the void with dread.
+**5. Subtractive sound design.** Horror and tension through *removal*. Sounds disappear. Static intensifies. The phone line degrades. Your brain fills the silence.
 
-**6. Provider-agnostic engine.** The story content and game engine are decoupled from the AI provider. Swap `mistral-adapter.ts` for a Gemini or Nova adapter -- same story runs on any LLM. Built for portability.
+**6. Provider-agnostic engine.** The story content, prompt system, and sound engine are decoupled from the AI provider. The system prompt approach works with any LLM ElevenLabs supports. Built for portability.
 
 ---
 
@@ -160,14 +207,15 @@ This is a **pipeline, not an agentic system**. No autonomous agents, no multi-st
 | Component | Technology |
 |---|---|
 | Framework | Next.js 16 (React 19, TypeScript, App Router) |
-| AI Narration | Mistral Large (`mistral-large-latest`) |
-| Intent Classification | Mistral Small (`mistral-small-latest`) |
+| AI Narration | Mistral Large (`mistral-large-latest`) via ElevenLabs agent config |
 | Voice I/O | ElevenLabs Conversational AI (WebRTC, STT, TTS) |
-| Audio Engine | Web Audio API (spatial sound, ambient layers, dynamic mixing) |
-| Story Content | YAML (31 files, 14,000+ lines across 3 stories) |
-| Source Code | 34 TypeScript files, ~2,000 lines |
+| Client State | React useReducer (GameContext) -- no server session store |
+| Audio Engine | Web Audio API (spatial sound, ambient layers, dynamic mixing, OfflineAudioContext synthesis) |
+| Story Content | TypeScript (system prompts, sound timelines, keyword rules) |
+| Source Code | ~40 TypeScript files |
+| Server Routes | 1 API route: `/api/signed-url` |
 | Deployment | Vercel (serverless) |
-| SDK | `@mistralai/mistralai` 1.14.1, `@elevenlabs/react` 0.14.1 |
+| SDK | `@elevenlabs/react` 0.14.1 |
 
 ---
 
@@ -181,7 +229,7 @@ Every design decision has a research basis:
 - **Silence before the scare** -- brain fills silence with imagination; 2s silence > any loud sound
 - **Dread 80%, Terror 15%, Horror 5%** -- Orson Scott Card's hierarchy. Alien shows 4 minutes of monster in 117 minutes of film.
 - **Sounds disappearing = dread** -- subtractive sound design is more effective than additive for horror
-- **Somatic suggestion** ("You feel cold on your neck") -- works without hypnosis in eyes-closed states (Markmann 2023)
+- **Somatic suggestion** ("You feel the cold floor under your feet") -- works without hypnosis in eyes-closed states (Markmann 2023)
 
 ---
 
@@ -189,7 +237,7 @@ Every design decision has a research basis:
 
 **Live demo**: [https://mistral-lac.vercel.app](https://mistral-lac.vercel.app)
 
-Put on headphones. Close your eyes. Speak.
+Put on headphones. Close your eyes. Answer the call.
 
 ---
 

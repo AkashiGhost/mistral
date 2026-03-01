@@ -109,53 +109,36 @@ export type SoundSet = Record<string, AudioBuffer>;
 
 /** The Last Session — therapy office: rain, HVAC hum, clock, drones */
 async function generateLastSessionSounds(): Promise<SoundSet> {
-  const [rain, hvac, clock, cello_drone, sub_bass, low_tone] =
-    await Promise.all([
-      generateFilteredNoise(8, "bandpass", 4000, 0.5, 0.15),
-      generateFilteredNoise(6, "lowpass", 100, 1.0, 0.2),
-      generateClockTick(),
-      generateDrone(73.4, "sawtooth", 8, 0.25),
-      generateDrone(25, "sine", 6, 0.3),
-      generateDrone(90, "sine", 6, 0.35),
-    ]);
+  // Sequential rendering to avoid starving WebRTC audio thread
+  const rain = await generateFilteredNoise(8, "bandpass", 4000, 0.5, 0.15);
+  const hvac = await generateFilteredNoise(6, "lowpass", 100, 1.0, 0.2);
+  const clock = await generateClockTick();
+  const cello_drone = await generateDrone(73.4, "sawtooth", 8, 0.25);
+  const sub_bass = await generateDrone(25, "sine", 6, 0.3);
+  const low_tone = await generateDrone(90, "sine", 6, 0.35);
   return { rain, hvac, clock, cello_drone, sub_bass, low_tone };
 }
 
 /** The Lighthouse — coastal storm: ocean waves, wind, creaking, foghorn drone */
 async function generateLighthouseSounds(): Promise<SoundSet> {
-  const [ocean, wind, creak, foghorn_drone, sub_bass] =
-    await Promise.all([
-      // Ocean: lowpass noise at 800Hz — deep rumbling waves
-      generateFilteredNoise(8, "lowpass", 800, 0.3, 0.2),
-      // Wind: bandpass noise at 2000Hz — howling gale
-      generateFilteredNoise(8, "bandpass", 2000, 0.8, 0.12),
-      // Creak: very narrow bandpass at 300Hz — wood groaning
-      generateFilteredNoise(4, "bandpass", 300, 5.0, 0.08),
-      // Foghorn: low sawtooth drone at A1 (55Hz)
-      generateDrone(55, "sawtooth", 8, 0.2),
-      // Sub bass: rumbling 30Hz foundation
-      generateDrone(30, "sine", 6, 0.25),
-    ]);
+  // Sequential rendering to avoid starving WebRTC audio thread
+  const ocean = await generateFilteredNoise(8, "lowpass", 800, 0.3, 0.2);
+  const wind = await generateFilteredNoise(8, "bandpass", 2000, 0.8, 0.12);
+  const creak = await generateFilteredNoise(4, "bandpass", 300, 5.0, 0.08);
+  const foghorn_drone = await generateDrone(55, "sawtooth", 8, 0.2);
+  const sub_bass = await generateDrone(30, "sine", 6, 0.25);
   return { ocean, wind, creak, foghorn_drone, sub_bass };
 }
 
 /** Room 4B — abandoned hospital: fluorescent hum, machinery, metallic echo, heartbeat */
 async function generateRoom4bSounds(): Promise<SoundSet> {
-  const [fluorescent_hum, machinery, metal_echo, heartbeat_drone, sub_bass, low_tone] =
-    await Promise.all([
-      // Fluorescent hum: narrow bandpass at 120Hz (mains frequency harmonic)
-      generateFilteredNoise(6, "bandpass", 120, 8.0, 0.15),
-      // Distant machinery: lowpass rumble at 200Hz
-      generateFilteredNoise(8, "lowpass", 200, 0.5, 0.1),
-      // Metal echo: sharp bandpass at 1200Hz — thin metallic resonance
-      generateFilteredNoise(4, "bandpass", 1200, 6.0, 0.05),
-      // Heartbeat-like drone: sine at 40Hz with slight detune
-      generateDrone(40, "sine", 6, 0.2),
-      // Sub bass: 20Hz rumble
-      generateDrone(20, "sine", 6, 0.25),
-      // Low tone: 80Hz revelation
-      generateDrone(80, "sine", 6, 0.3),
-    ]);
+  // Sequential rendering to avoid starving WebRTC audio thread
+  const fluorescent_hum = await generateFilteredNoise(6, "bandpass", 120, 8.0, 0.15);
+  const machinery = await generateFilteredNoise(8, "lowpass", 200, 0.5, 0.1);
+  const metal_echo = await generateFilteredNoise(4, "bandpass", 1200, 6.0, 0.05);
+  const heartbeat_drone = await generateDrone(40, "sine", 6, 0.2);
+  const sub_bass = await generateDrone(20, "sine", 6, 0.25);
+  const low_tone = await generateDrone(80, "sine", 6, 0.3);
   return { fluorescent_hum, machinery, metal_echo, heartbeat_drone, sub_bass, low_tone };
 }
 
@@ -492,26 +475,22 @@ async function generateDisconnectTone(): Promise<AudioBuffer> {
 
 /** The Call — underground phone call: phone static, electrical hum, sub bass, ring, click, disconnect + reactive environment sounds */
 async function generateTheCallSounds(): Promise<SoundSet> {
-  const [
-    phone_static, electrical_hum, sub_bass, phone_ring, pickup_click, disconnect_tone,
-    footsteps, water_drip, door_creak, keypad_beep, metal_scrape, pipe_clank, heavy_breathing,
-  ] = await Promise.all([
-    // Existing sounds
-    generateFilteredNoise(6, "bandpass", 3000, 2.0, 0.05),
-    generateDrone(60, "sine", 6, 0.08),
-    generateDrone(30, "sine", 6, 0.15),
-    generatePhoneRing(),
-    generatePickupClick(),
-    generateDisconnectTone(),
-    // New reactive sounds
-    generateFootsteps(),
-    generateWaterDrip(),
-    generateDoorCreak(),
-    generateKeypadBeeps(),
-    generateMetalScrape(),
-    generatePipeClank(),
-    generateHeavyBreathing(),
-  ]);
+  // Sequential rendering — 13 concurrent OfflineAudioContext renders via Promise.all()
+  // was starving the WebRTC audio thread, causing glitching in the first few seconds.
+  // Sequential await lets the audio thread breathe between each render.
+  const phone_static = await generateFilteredNoise(6, "bandpass", 3000, 2.0, 0.05);
+  const electrical_hum = await generateDrone(60, "sine", 6, 0.08);
+  const sub_bass = await generateDrone(30, "sine", 6, 0.15);
+  const phone_ring = await generatePhoneRing();
+  const pickup_click = await generatePickupClick();
+  const disconnect_tone = await generateDisconnectTone();
+  const footsteps = await generateFootsteps();
+  const water_drip = await generateWaterDrip();
+  const door_creak = await generateDoorCreak();
+  const keypad_beep = await generateKeypadBeeps();
+  const metal_scrape = await generateMetalScrape();
+  const pipe_clank = await generatePipeClank();
+  const heavy_breathing = await generateHeavyBreathing();
   return {
     phone_static, electrical_hum, sub_bass, phone_ring, pickup_click, disconnect_tone,
     footsteps, water_drip, door_creak, keypad_beep, metal_scrape, pipe_clank, heavy_breathing,
