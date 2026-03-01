@@ -245,9 +245,12 @@ export function GameProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // ── ElevenLabs ConvAI hook — stable callbacks prevent identity churn ──
-  // micMuted is a controlled prop: when it changes the SDK calls setMicMuted()
-  // on the underlying VoiceConversation, which mutes the audio worklet input
-  // stream so no audio is sent to ElevenLabs while paused.
+  // micMuted + volume are controlled props per ElevenLabs docs:
+  //   https://elevenlabs.io/docs/eleven-agents/libraries/react
+  // When isPaused: mic muted + volume 0 → full silence.
+  // When playing: mic open + volume 1 → normal audio.
+  // IMPORTANT: Use props (not setVolume method) — the method called before
+  // session start can corrupt the SDK's internal audio state.
   const conversation = useConversation({
     onConnect: stableOnConnect,
     onDisconnect: stableOnDisconnect,
@@ -255,6 +258,7 @@ export function GameProvider({ children }: { children: ReactNode }) {
     onModeChange: stableOnModeChange,
     onError: stableOnError,
     micMuted: state.isPaused,
+    volume: state.isPaused ? 0 : 1,
   });
 
   // Keep ref fresh so startSession/endSession/togglePause always use current object
@@ -360,10 +364,9 @@ export function GameProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "TOGGLE_PAUSE" });
   }, []);
 
-  // Apply TTS output volume via effect so it reads the committed state value
-  useEffect(() => {
-    conversationRef.current?.setVolume({ volume: state.isPaused ? 0 : 1 });
-  }, [state.isPaused]);
+  // Volume is now controlled via the `volume` prop on useConversation above.
+  // The old setVolume() method call was removed because calling it before
+  // session start could corrupt the SDK's audio initialization.
 
   // ── Cleanup on unmount ────────────────────────────────────────
   useEffect(() => {
