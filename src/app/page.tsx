@@ -277,6 +277,57 @@ export default function Home() {
               A new kind of game. No screen. No UI. Just your voice and your
               imagination.
             </motion.p>
+
+            <motion.a
+              href="https://youtu.be/T1T3AoJ5IuU"
+              target="_blank"
+              rel="noopener noreferrer"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.7, delay: 2.0, ease: "easeOut" }}
+              style={{
+                marginBlockStart: "var(--space-md)",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "10px",
+                fontFamily: "var(--font-display)",
+                fontSize: "var(--type-ui)",
+                color: "var(--muted)",
+                letterSpacing: "2px",
+                textDecoration: "none",
+                border: "1px solid rgba(255,255,255,0.18)",
+                padding: "0 var(--space-md)",
+                height: 44,
+                transition: "border-color 0.3s ease, color 0.3s ease",
+              }}
+              onMouseEnter={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = "var(--accent)";
+                (e.currentTarget as HTMLAnchorElement).style.color = "var(--accent)";
+              }}
+              onMouseLeave={(e) => {
+                (e.currentTarget as HTMLAnchorElement).style.borderColor = "rgba(255,255,255,0.18)";
+                (e.currentTarget as HTMLAnchorElement).style.color = "var(--muted)";
+              }}
+            >
+              {/* Play triangle icon */}
+              <svg
+                width="12"
+                height="14"
+                viewBox="0 0 12 14"
+                fill="none"
+                xmlns="http://www.w3.org/2000/svg"
+                aria-hidden="true"
+              >
+                <path
+                  d="M1 1.5L11 7L1 12.5V1.5Z"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinejoin="round"
+                  fill="none"
+                />
+              </svg>
+              WATCH DEMO
+            </motion.a>
           </div>
 
           {/* Scroll-down indicator */}
