@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useState, useCallback } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useState, useCallback, useEffect } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { GameProvider, useGame } from "@/context/GameContext";
 import { DEFAULT_STORY_ID } from "@/lib/constants";
 import { OnboardingFlow } from "@/components/game/OnboardingFlow";
@@ -11,10 +11,18 @@ import { BreathingDot } from "@/components/ui/BreathingDot";
 
 function PlayContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const storyId = searchParams.get("story") ?? DEFAULT_STORY_ID;
 
   const [onboardingDone, setOnboardingDone] = useState(false);
   const { status, startSession, errorMessage } = useGame();
+
+  // Session ended — navigate back to stories
+  useEffect(() => {
+    if (onboardingDone && status === "idle") {
+      router.push("/#stories");
+    }
+  }, [onboardingDone, status, router]);
 
   const handleOnboardingComplete = useCallback(() => {
     setOnboardingDone(true);
